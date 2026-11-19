@@ -13,7 +13,8 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
-from lectures import group_by_label, guard_previous, target_paths  # noqa: E402
+from lectures import (ROOT as LROOT, clean_course_name, group_by_label,  # noqa: E402
+                     guard_previous, resolve_outdir, target_paths)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -107,6 +108,20 @@ u3 = [
     "https://i/videos/o/site/Room/20261112/080000-095500-1/ENCODER-abc?ts=1&token=x",
 ]
 check("分组 不同日期", len(group_by_label(u3)) == 2, list(group_by_label(u3)))
+
+# 4) 课程名清洗 / 落点推导
+check("清掉 (1) 后缀", clean_course_name("XX课程 (1)") == "XX课程",
+      clean_course_name("XX课程 (1)"))
+check("清掉 (12) 后缀", clean_course_name("XX课程 (12)") == "XX课程",
+      clean_course_name("XX课程 (12)"))
+check("正常名字不动", clean_course_name("XX课程") == "XX课程",
+      clean_course_name("XX课程"))
+check("空名兜底", clean_course_name("") == "", clean_course_name(""));
+
+from types import SimpleNamespace  # noqa: E402
+args = SimpleNamespace(dest="")
+got_out = resolve_outdir(args, "tmp/XX课程 (1).txt")
+check("落点去掉 (1)", got_out == LROOT / "media" / "XX课程", str(got_out))
 
 shutil.rmtree(BASE, ignore_errors=True)
 print("\n全部通过" if bad == 0 else f"\n{bad} 项失败")

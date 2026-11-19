@@ -15,8 +15,9 @@ lectures.py - 主编排：清单 → 下载 → 抽音轨 → 命名 → 归档 
 import argparse
 import pathlib
 import re
-import shutil
 import os
+import re
+import shutil
 import subprocess
 import sys
 import time
@@ -95,6 +96,14 @@ FFPROBE = _exe("ffprobe")
 
 # ---------------- 落点 ---------------- #
 
+DUP_SUFFIX = re.compile(r"\s*\(\d+\)$")
+
+
+def clean_course_name(stem):
+    """去掉浏览器/资源管理器重名后缀：'X (1)' -> 'X'。"""
+    return DUP_SUFFIX.sub("", stem).strip() or stem
+
+
 def resolve_outdir(args, urls_file=""):
     """落点完全由清单文件名决定：lists\\X.txt -> media\\X\\
 
@@ -104,7 +113,7 @@ def resolve_outdir(args, urls_file=""):
     if getattr(args, "dest", ""):
         return ROOT / args.dest
     if urls_file:
-        return ROOT / "media" / pathlib.Path(urls_file).stem
+        return ROOT / "media" / clean_course_name(pathlib.Path(urls_file).stem)
     return ROOT / "media"
 
 

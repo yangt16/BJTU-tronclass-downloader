@@ -157,7 +157,7 @@ D:\course-notes\
 ├─ LICENSE                    MIT 许可证
 ├─ CHANGELOG.md               版本更新日志
 ├─ bin\                       ffmpeg / ffprobe
-├─ tools\                     21 个脚本（下载、编排、抓取、测试）
+├─ tools\                     22 个脚本（下载、编排、抓取、测试）
 │  ├─ getlec.cmd / getlec.sh  主脚本（各入口都调用它）
 │  └─ ...                     其余工具与测试
 ├─ dist\                      抓取书签（install.html / bookmarks.html）

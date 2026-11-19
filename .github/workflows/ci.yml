@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # 入口脚本冒烟测试用：只算路径、不联网、不下载
+  CI_FAKE_URL: "https://example.invalid/videos/o/site/20261111/080000-095500-1/ENCODER-x?ts=1"
+
 jobs:
   # ---------------- Windows ----------------
   test-windows:
@@ -20,11 +24,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Python 测试（7 套）
+      - name: Python 测试（8 套，含下载集成测试）
         shell: bash
         run: |
           set -e
-          for t in test_naming test_modes test_filter test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+          for t in test_naming test_modes test_filter test_download test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
             echo "::group::$t"
             python "tools/$t.py"
             echo "::endgroup::"
@@ -32,6 +36,22 @@ jobs:
 
       - name: 书签脚本逻辑测试（需 Node）
         run: node tools/test_scrape.js dist/bookmarklet.txt
+
+      - name: 入口脚本冒烟（dry-run，不下载）
+        shell: cmd
+        run: |
+          if not exist lists mkdir lists
+          if not exist tmp mkdir tmp
+          echo %CI_FAKE_URL%> lists\ci.txt
+          set GETLEC_DRYRUN=1
+          set GETLEC_NOPAUSE=1
+          call 1-下视频和音频.cmd lists\ci.txt > ci_out.txt 2>&1
+          type ci_out.txt
+          findstr /c:"[mode]" ci_out.txt || exit /b 1
+          findstr /c:"[dest]" ci_out.txt || exit /b 1
+          echo 20261111| call 4-只下某一天.cmd lists\ci.txt > ci_day.txt 2>&1
+          type ci_day.txt
+          findstr /c:"[filter]" ci_day.txt || exit /b 1
 
   # ---------------- macOS ----------------
   test-macos:
@@ -43,7 +63,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: ffmpeg（macOS runner 不保证预装时补上）
+      - name: ffmpeg（runner 不保证预装时补上）
         run: |
           command -v ffmpeg && ffmpeg -version | head -1 || brew install ffmpeg
 
@@ -55,7 +75,7 @@ jobs:
             bash -n "$f"
           done
 
-      - name: 实际运行 0-首次安装.command 与 tools/getlec.sh
+      - name: 实际运行首次安装与主脚本
         env:
           GETLEC_NOPAUSE: "1"
         run: |
@@ -63,16 +83,69 @@ jobs:
           printf '\n' | sh ./0-首次安装.command
           sh ./tools/getlec.sh
 
+      - name: 入口脚本冒烟（dry-run）
+        run: |
+          set -e
+          mkdir -p lists
+          printf '%s\n' "$CI_FAKE_URL" > "lists/ci smoke.txt"
+          export GETLEC_DRYRUN=1 GETLEC_NOPAUSE=1
+          out=$(sh "./1-下视频和音频.command" "lists/ci smoke.txt" 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "\[mode\] 视频 + 音轨"
+          echo "$out" | grep -q "节:"
+          out2=$(printf '20261111\n' | sh "./4-只下某一天.command" "lists/ci smoke.txt" 2>&1)
+          echo "$out2"
+          echo "$out2" | grep -q "\[filter\]"
+
       - name: Python 测试 + shell 入口检查（含可执行位）
         run: |
           set -e
-          for t in test_naming test_modes test_filter test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+          for t in test_naming test_modes test_filter test_download test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
             echo "::group::$t"
             python "tools/$t.py"
             echo "::endgroup::"
           done
 
-  # ---------------- 打包冒烟（Linux runner，不需要 ffmpeg） ----------------
+  # ---------------- Linux（顺带验证 3.8 下限） ----------------
+  test-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: shell 语法检查
+        run: |
+          set -e
+          for f in tools/*.sh *.command; do bash -n "$f"; done
+
+      - name: 入口脚本冒烟（dry-run）
+        run: |
+          set -e
+          mkdir -p lists
+          printf '%s\n' "$CI_FAKE_URL" > lists/ci.txt
+          export GETLEC_DRYRUN=1 GETLEC_NOPAUSE=1
+          out=$(sh ./1-下视频和音频.command lists/ci.txt 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "\[mode\] 视频 + 音轨"
+          echo "$out" | grep -q "节:"
+
+      - name: Python 测试（含下载集成测试）
+        run: |
+          set -e
+          for t in test_naming test_modes test_filter test_download test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+            echo "::group::$t"
+            python "tools/$t.py"
+            echo "::endgroup::"
+          done
+
+  # ---------------- 打包冒烟（不需要 ffmpeg） ----------------
   package-mac:
     runs-on: ubuntu-latest
     steps:
@@ -94,7 +167,7 @@ jobs:
           z = zipfile.ZipFile(path)
           names = z.namelist()
 
-          assert any(n.endswith("tools/getlec.sh") for n in names), "缺 tools/getlec.sh"
+          assert any(n.endswith("getlec.sh") for n in names), "缺 tools/getlec.sh"
           assert any(n.endswith("0-首次安装.command") for n in names), "缺 0-首次安装.command"
           assert any(n.endswith("dist/bookmarks.html") for n in names), "缺 bookmarks.html"
           assert any(n.endswith("/lists/") for n in names), "缺 lists/ 空目录"

@@ -15,6 +15,13 @@
   - `只下某一天` → `4-只下某一天`
 - `getlec.cmd` / `getlec.sh` 移入 `tools\`（普通用户不需要直接调用）
 
+### 新增
+- **失败节自动重试**：一轮结束后自动再试一次失败的节，仍失败才报错
+- **下载集成测试** `tools/test_download.py`：本地假 HTTP 服务器，
+  覆盖完整下载、断点续传、500 重试、忽略 Range、403、302 resolve（12 项）
+- CI 增强：Windows/macOS 入口脚本真机冒烟（dry-run）、Linux 3.8/3.11 矩阵、
+  集成测试纳入三个平台
+
 ### 说明
 - 用户操作不变：仍是双击编号入口
 - 高级用法路径变化：`tools\getlec.cmd lists\XX课程.txt INSTRUCTOR`

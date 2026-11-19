@@ -387,11 +387,13 @@ def main():
     mode_cn = {"both": "视频 + 音轨", "audio": "只要音轨", "video": "只要视频"}[mode]
     print(f"[mode] {mode_cn}")
 
-    done_dates, failed = [], 0
-    n_new = n_skip = 0
-    for idx, (key, us) in enumerate(groups.items(), 1):
-        label = label_of(us[0])
-        print(f"\n=== 第 {idx}/{len(groups)} 节: {label}  轨: {[track_of(u) for u in us]} ===")
+    done_dates = []
+    counters = {"new": 0, "skip": 0, "failed": 0}
+
+    def process(label, us, idx, total, retry=False):
+        """处理一节；返回 new / skip / failed / dry。"""
+        tag = "重试 " if retry else ""
+        print(f"\n=== {tag}第 {idx}/{total} 节: {label}  轨: {[track_of(u) for u in us]} ===")
         want = [u for u in us if track_of(u) == a.track.upper()]
         pick = want[0] if want else us[0]
         if not want and len(us) > 1:
@@ -400,12 +402,10 @@ def main():
         date = labels_parts(label)[0]
         if a.dry_run:
             mp4, m4a = target_paths(outdir, label)
-            if mode == "video":
-                print(f"  将写入: {mp4}")
-            else:
-                print(f"  将写入: {mp4}")
+            print(f"  将写入: {mp4}")
+            if mode != "video":
                 print(f"          {m4a}")
-            continue
+            return "dry"
 
         outdir.mkdir(parents=True, exist_ok=True)
         guard_previous(outdir / date, label, course_name(outdir), date)
@@ -414,34 +414,33 @@ def main():
         # 增量下载的核心：本地已有完整产物就整节跳过，不联网、不重抽音轨
         if not a.force and already_done(mp4, m4a, mode):
             print(f"  跳过（已下载）{mp4.name if mode != 'audio' else m4a.name}")
-            n_skip += 1
+            counters["skip"] += 1
             done_dates.append(date)
-            continue
+            return "skip"
 
         print(f"  [下载] -> {mp4}")
         try:
             download(pick, mp4)
         except Exception as e:
             print(f"  下载失败: {e}")
-            failed += 1
-            continue
+            counters["failed"] += 1
+            return "failed"
 
         if mode == "video":
-            # 只要视频：不抽音轨，直接收工
-            n_new += 1
+            counters["new"] += 1
             print(f"      视频 {mp4.name}  {mp4.stat().st_size/1e6:.1f} MB")
             print("  [信息]")
             print("      " + info_of(mp4).replace("\n", "\n      "))
             print(f"\n  视频用这个: {mp4}")
             done_dates.append(date)
-            continue
+            return "new"
 
         print(f"  [抽音频] -> {m4a.name}")
         if not extract_audio(mp4, m4a):
-            failed += 1
-            continue
+            counters["failed"] += 1
+            return "failed"
         print(f"      {m4a.name}  {m4a.stat().st_size/1e6:.1f} MB")
-        n_new += 1
+        counters["new"] += 1
         if a.drop_video:
             freed = mp4.stat().st_size
             mp4.unlink()
@@ -451,9 +450,31 @@ def main():
         print("      " + info_of(m4a).replace("\n", "\n      "))
         print(f"\n  上传用这个: {m4a}")
         done_dates.append(date)
+        return "new"
 
+    # 第一轮
+    items = list(groups.items())
+    retry_queue = []
+    for idx, (label, us) in enumerate(items, 1):
+        if process(label, us, idx, len(items)) == "failed":
+            retry_queue.append((label, us))
+
+    # 失败节自动重试一轮（网络抖动很常见，一次就放弃太亏）
+    retried = 0
+    if retry_queue and not a.dry_run:
+        retried = len(retry_queue)
+        print(f"\n[retry] 有 {retried} 节失败，自动重试一轮 ...")
+        again = list(retry_queue)
+        retry_queue = []
+        for idx, (label, us) in enumerate(again, 1):
+            if process(label, us, idx, len(again), retry=True) == "failed":
+                retry_queue.append((label, us))
+
+    failed = len(retry_queue)
     if not a.dry_run:
-        print(f"\n[小结] 新下载 {n_new} 节 / 跳过 {n_skip} 节 / 失败 {failed} 节")
+        print(f"\n[小结] 新下载 {counters['new']} 节 / 跳过 {counters['skip']} 节 / 失败 {failed} 节")
+        if retried:
+            print(f"[retry] {retried} 节重试，其中 {retried - failed} 节成功")
 
     if a.dry_run or failed or not done_dates:
         return 1 if failed else 0

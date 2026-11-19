@@ -31,7 +31,10 @@ def check(name, ok, detail=""):
 
 scripts = sorted(set(list(ROOT.glob("*.sh")) + list(ROOT.glob("*.command"))
                      + list((ROOT / "tools").glob("*.sh"))))
-check("找到 shell 入口脚本", len(scripts) >= 6, f"实际 {len(scripts)} 个")
+# 根目录只该有两个 .command（首次安装 + 开始下载），外加 tools/getlec.sh
+expected = {"0-首次安装.command", "1-开始下载.command", "getlec.sh"}
+check("根目录 shell 入口集合正确", {p.name for p in scripts} == expected,
+      sorted(p.name for p in scripts))
 
 for p in scripts:
     raw = p.read_bytes()

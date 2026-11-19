@@ -9,6 +9,7 @@
 #   sh tools/getlec.sh                 everything in lists/
 #   sh tools/getlec.sh lists/MYCOURSE.txt    only that list
 #   sh tools/getlec.sh lists/X.txt INSTRUCTOR  another track
+#   sh tools/getlec.sh --menu                  interactive menu
 set -u
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -28,6 +29,11 @@ if [ -z "$PY" ]; then
     echo "         Linux: sudo apt install python3"
     if [ -z "${GETLEC_NOPAUSE:-}" ]; then printf "\nPress Enter to close..."; read -r _ || true; fi
     exit 9009
+fi
+
+if [ "${1:-}" = "--menu" ]; then
+    "$PY" "$ROOT/tools/menu.py"
+    exit $?
 fi
 
 # ---------- mode flags ----------

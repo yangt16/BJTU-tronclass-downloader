@@ -74,8 +74,9 @@ echo  setup done.
 echo.
 echo  next:
 echo    1. put a course list into lists\ (see docs for how)
-echo    2. double-click one of the numbered .cmd entries in
-echo       this folder: 1 video+audio, 2 audio, 3 video, 4 one day
+echo    2. double-click the entry starting with 1 in this folder
+echo       a menu will ask: product (video/audio/both) and scope
+echo       (all / one day / weekdays / exclude weekdays)
 echo ============================================================
 if "%GETLEC_NOPAUSE%"=="" pause
 exit /b 0

@@ -10,6 +10,7 @@ REM
 REM  usage:
 REM     tools\getlec.cmd             download everything in lists\
 REM     tools\getlec.cmd --all         same as above
+REM     tools\getlec.cmd --menu        interactive menu (1-start entry uses this)
 REM     tools\getlec.cmd lists\MYCOURSE.txt   only that list
 REM     tools\getlec.cmd lists\X.txt INSTRUCTOR   another track
 REM
@@ -45,6 +46,7 @@ exit /b 9009
 :havepy
 
 set "PY=%PYEXE%"
+if /i "%~1"=="--menu" goto menu
 set "DRYARG="
 if "%GETLEC_DRYRUN%"=="1" set "DRYARG=--dry-run"
 set "DROPARG="
@@ -126,6 +128,10 @@ REM -----------------------------------------------------------
 REM  subroutines at the very end: the main flow must not fall
 REM  through into them (that was a real bug once).
 REM -----------------------------------------------------------
+:menu
+"%PY%" "%ROOT%\tools\menu.py"
+exit /b %ERRORLEVEL%
+
 :trypy
 "%~1" -c "import sys" >nul 2>nul
 if not errorlevel 1 set "PYEXE=%~1"

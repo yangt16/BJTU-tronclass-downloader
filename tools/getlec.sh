@@ -67,8 +67,6 @@ run_one() {
 if [ -z "$FIRST" ] || [ "$FIRST" = "--all" ]; then
     echo "[getlec] BATCH mode over $ROOT/lists"
     echo
-    # pick up lists exported by the browser scraper (Downloads folder)
-    "$PY" "$ROOT/tools/import_lists.py"
     "$PY" "$ROOT/tools/lists.py"
     FOUND=0
     for f in "$ROOT"/lists/*.txt; do

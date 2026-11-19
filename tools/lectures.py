@@ -114,30 +114,6 @@ def course_name(outdir):
     return name if name and name.lower() != "media" else "课程"
 
 
-LIST_TEMPLATE = """# ============================================================
-#  {course} · 待下载清单
-#
-#  怎么拿地址（每节约 15 秒）:
-#     1. 打开那节回放页，F12 开 Network
-#     2. 筛选框输入 ENCODER（或点上面的「媒体」标签）
-#     3. 点播放，等出现 ENCODER-... 那条（状态 206、类型 媒体）
-#        如果列表里没有 -> 勾上「禁用缓存」再按 F5 刷新，然后点播放
-#     4. 右键那一行 -> 复制 -> 复制 URL
-#     5. 粘到本文件末尾，一行一个
-#
-#  粘完双击 1-下视频和音频.cmd 就会下载。
-#  产物: media\\{course}\\<日期>\\{course}_<日期>.mp4 + .m4a
-#
-#  跑完本文件自动归档进 har_archive\\urls_<日期>.txt，并重建一个空的。
-#  以 # 开头是注释。文件为空也没关系，批量模式会跳过。
-# ============================================================
-"""
-
-
-def template_for(course):
-    return LIST_TEMPLATE.format(course=course)
-
-
 # ---------------- 地址与命名 ---------------- #
 
 
@@ -316,7 +292,7 @@ def info_of(path):
 # ---------------- 主流程 ---------------- #
 
 def archive_list(urls_file, dates, outdir):
-    """归档已跑完的清单，并在**原路径**重建一份空模板（否则用户没地方粘下一批）。"""
+    """归档已跑完的清单，并从 lists\\ 移走（lists 里只保留 .md 索引）。"""
     src = pathlib.Path(urls_file)
     arc = ROOT / "har_archive"
     arc.mkdir(exist_ok=True)
@@ -325,13 +301,7 @@ def archive_list(urls_file, dates, outdir):
     if dest.exists():
         dest = arc / f"urls_{'_'.join(sorted(set(dates)))}_{int(time.time())}.txt"
     src.replace(dest)
-    print(f"\n[archive] 地址清单已归档 -> {dest.name}")
-    try:
-        src.parent.mkdir(parents=True, exist_ok=True)
-        src.write_text(template_for(course_name(outdir)), encoding="utf-8")
-        print(f"[archive] 已重建空清单 {src}")
-    except Exception as e:
-        print(f"[archive] 重建空清单失败: {e}")
+    print(f"\n[archive] 清单已归档 -> {dest.name}（lists 里不再保留 txt）")
     try:
         import make_index
         idx = make_index.rebuild(outdir)     # 必须传本次落点，不能用默认

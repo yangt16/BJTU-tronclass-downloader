@@ -1,8 +1,8 @@
 """
 lists.py - 确保 lists\\ 目录存在，并报告有哪些待下载清单。
 
-只有一个入口：用户在 lists\\ 下自己建 <科目>.txt。
-清单名就是课程名、文件夹名、文件名前缀。
+清单可以放进 lists\\，也可以直接把 txt 拖到入口图标上。
+清单名就是课程名、文件夹名、文件名前缀；跑完会归档，lists\\ 只保留 .md 索引。
 """
 import pathlib
 import sys
@@ -40,11 +40,12 @@ def main():
         print("=" * 56)
         print("  lists\\ 里还没有可下载的清单")
         print("=" * 56)
-        print(f"  在 {LISTS} 下新建一个 <科目名>.txt，例如：")
+        print(f"  把抓取导出的 txt 放进 {LISTS}（或直接拖到入口图标上）。")
+        print("  文件名就是课程名，例如：")
         print("    lists\\X.txt")
-        print("  把每节课的播放地址粘进去（一行一个），再双击 1-下视频和音频.cmd。")
+        print("  拿地址: 用书签抓取（推荐），或回放页 F12 -> 筛 ENCODER -> 右键复制 URL")
         print("")
-        print("  拿地址: 回放页 F12 -> 筛 ENCODER -> 播放 -> 右键复制 URL")
+        print("  跑完后 txt 会自动归档到 har_archive\\，lists\\ 只保留 <课程>.md 索引。")
         if items:
             print("")
             print("  当前已有但为空的清单:")

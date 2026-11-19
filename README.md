@@ -105,7 +105,7 @@ media\XX课程\20260921\
 └─ XX课程_20260921.m4a     111.5 MB   音轨  ← 转写用这个
 ```
 
-跑完会自动归档清单、刷新已下载索引 `lists\XX课程.md`。
+跑完会自动归档清单（`lists\` 里不再留 txt）、刷新已下载索引 `lists\XX课程.md`。
 
 ---
 
@@ -119,7 +119,7 @@ media\XX课程\20260921\
    - **Chrome**：拖拽容易丢 `javascript:` 前缀，改用导入 ——
      打开 `chrome://bookmarks` → 右上 `⋮` → **导入书签** → 选 `dist\bookmarks.html`
 3. 打开课程的「直播」列表页 → 点一下书签 → 清单自动下载
-4. 双击下载入口（会自动收编清单并开始下载）
+4. 把下载的 txt 放进 `lists\\`（或直接拖到入口图标上），双击入口；跑完 txt 自动归档
 
 原理与接口细节见 [使用说明 · 自动版](docs/使用说明.md#自动版书签一次抓一门课)。
 
@@ -162,7 +162,7 @@ D:\course-notes\
 │  ├─ getlec.cmd / getlec.sh  主脚本（各入口都调用它）
 │  └─ ...                     其余工具与测试
 ├─ dist\                      抓取书签（install.html / bookmarks.html）
-├─ lists\                     ★ 在这里建 <科目>.txt
+├─ lists\                     ★ 放抓取清单；跑完归档，只留 <课程>.md
 ├─ media\                     ★ 下载产物
 ├─ har_archive\               历史清单归档
 ├─ release\                   发布包产物（构建生成，不入库）

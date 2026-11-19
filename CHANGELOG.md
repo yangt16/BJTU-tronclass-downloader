@@ -25,6 +25,11 @@
 - **日志文件**：`GETLEC_LOG=1` 或 `--log <目录>`，输出同时写进
   `logs/<课程名>_<时间>.log`
 - CI actions 升级到 `checkout@v6` / `setup-python@v6`（消除 Node 20 弃用警告）
+- **不再扫描用户目录**：移除 `import_lists.py`，程序不碰「下载」「桌面」
+  清单由用户放进 `lists\` 或直接拖到入口图标上
+- **清单跑完即归档**：归档到 `har_archive\` 后不再重建空模板，
+  `lists\` 里只保留 `<课程>.md` 索引
+- 新增 `tools/test_archive.py`（8 项）：归档移走、不重建模板、重复日期不覆盖
 
 ### 说明
 - 用户操作不变：仍是双击编号入口

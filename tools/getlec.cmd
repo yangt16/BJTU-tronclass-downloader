@@ -64,6 +64,8 @@ set "EXCLARG="
 if not "%GETLEC_EXCLUDE%"=="" set "EXCLARG=--exclude %GETLEC_EXCLUDE%"
 set "JOBSARG="
 if not "%GETLEC_JOBS%"=="" set "JOBSARG=--jobs %GETLEC_JOBS%"
+set "SEGARG="
+if not "%GETLEC_SEGMENTS%"=="" set "SEGARG=--segments %GETLEC_SEGMENTS%"
 
 if not "%TRACK%"=="" goto hafetrack
 set "TRACK=ENCODER"
@@ -101,7 +103,7 @@ echo ============================================================
 echo [getlec] LIST %LIST%
 echo [getlec] track=%TRACK%
 echo ============================================================
-"%PY%" "%ROOT%\tools\lectures.py" --urls "%LIST%" --track "%TRACK%" %DRYARG% %DROPARG% %NOAUDIOARG% %KEEPARG% %FORCEARG% %ONLYARG% %EXCLARG% %JOBSARG%
+"%PY%" "%ROOT%\tools\lectures.py" --urls "%LIST%" --track "%TRACK%" %DRYARG% %DROPARG% %NOAUDIOARG% %KEEPARG% %FORCEARG% %ONLYARG% %EXCLARG% %JOBSARG% %SEGARG%
 if errorlevel 1 goto p_failed
 echo [getlec] OK
 echo.

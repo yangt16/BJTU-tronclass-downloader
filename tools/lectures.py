@@ -26,7 +26,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from get_media import download, resolve  # noqa: E402
+from get_media import SEG_CONN_MAX, SEG_MAX, download, resolve  # noqa: E402
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -386,6 +386,22 @@ def resolve_jobs(arg, env=None):
     return max(1, min(MAX_JOBS, n))
 
 
+def resolve_segments(arg, env=None):
+    """--segments / GETLEC_SEGMENTS -> 1..SEG_MAX，默认 1（关闭）。"""
+    raw = arg if arg not in (None, "") else (env or os.environ).get("GETLEC_SEGMENTS", "")
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = 1
+    return max(1, min(n, SEG_MAX))
+
+
+def effective_segments(arg, jobs, env=None):
+    """分段数与节级并发组合后，总连接数不超过 SEG_CONN_MAX。"""
+    seg = resolve_segments(arg, env)
+    return min(seg, max(1, SEG_CONN_MAX // max(1, jobs)))
+
+
 def plan_sections(groups, outdir, mode, track, force=False, dry_run=False):
     """串行确定每节的落点、处理同一天多节改名、判断是否已下载。
 
@@ -478,6 +494,9 @@ def main():
                     help="把输出同时写进 DIR 下的日志文件（也可设 GETLEC_LOG=1 用默认 logs/）")
     ap.add_argument("--jobs", default="", metavar="N",
                     help=f"并发下载的节数，1-{MAX_JOBS}（默认 {DEFAULT_JOBS}；也可设 GETLEC_JOBS）")
+    ap.add_argument("--segments", default="", metavar="N",
+                    help=f"只下一两节时，单个文件再拆 N 段下载，1-{SEG_MAX}"
+                         "（默认 1 = 关闭；也可设 GETLEC_SEGMENTS）")
     a = ap.parse_args()
 
     # 缺 ffmpeg 时直接给一句人话，而不是等抽音轨阶段抛 FileNotFoundError
@@ -551,7 +570,9 @@ def main():
     print(f"[mode] {mode_cn}")
 
     jobs = resolve_jobs(a.jobs)
-    print(f"[jobs] 并发 {jobs} 路")
+    segments = effective_segments(a.segments, jobs)
+    extra = f"   单节 {segments} 段" if segments > 1 else ""
+    print(f"[jobs] 并发 {jobs} 路{extra}")
 
     todo, skipped_dates = plan_sections(groups, outdir, mode, a.track,
                                         force=a.force, dry_run=a.dry_run)
@@ -575,7 +596,7 @@ def main():
                   f"  轨: {[track_of(u) for u in job['urls']]} ===")
             print(f"  [下载] -> {job['mp4'].name}")
         try:
-            download(job["pick"], job["mp4"], quiet=jobs > 1)
+            download(job["pick"], job["mp4"], quiet=jobs > 1, segments=segments)
         except Exception as e:
             with PRINT_LOCK:
                 print(f"  下载失败: {e}")

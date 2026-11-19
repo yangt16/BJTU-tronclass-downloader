@@ -14,6 +14,7 @@ tmp/
 lists/*.md
 __pycache__/
 *.pyc
+*.segstate
 *.log
 
 # ---- 自己的历史草稿，不进仓库 ----

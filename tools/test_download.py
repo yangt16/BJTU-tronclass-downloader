@@ -13,6 +13,7 @@
 用法: python tools/test_download.py
 """
 import http.server
+import json
 import pathlib
 import re
 import shutil
@@ -192,6 +193,33 @@ try:
         # ---------- 8. 已是直链时 resolve 原样返回 ----------
         plain = handler.url("/media.bin")
         check("resolve 不动直链", resolve(plain) == plain)
+
+        # ---------- 9. 单文件多连接分段下载 ----------
+        seg = BASE / "seg.bin"
+        download(handler.url("/media.bin"), seg, segments=4)
+        check("分段下载字节一致", seg.read_bytes() == DATA)
+        check("分段状态文件已清理", not (BASE / "seg.bin.segstate").exists())
+
+        # 断点：第 1 段已下一半，状态文件记录进度
+        seg2 = BASE / "seg2.bin"
+        total = len(DATA)
+        n = 4
+        per = (total + n - 1) // n
+        half = per // 2
+        buf = bytearray(total)
+        buf[:half] = DATA[:half]
+        seg2.write_bytes(bytes(buf))
+        (BASE / "seg2.bin.segstate").write_text(
+            json.dumps({"total": total, "n": n, "done": [half, 0, 0, 0]}),
+            encoding="utf-8")
+        download(handler.url("/media.bin"), seg2, segments=4)
+        check("分段续传字节一致", seg2.read_bytes() == DATA)
+        check("续传后状态文件已清理", not (BASE / "seg2.bin.segstate").exists())
+
+        # 不整除：3 MB 拆 7 段
+        seg3 = BASE / "seg3.bin"
+        download(handler.url("/media.bin"), seg3, segments=7)
+        check("分段不整除字节一致", seg3.read_bytes() == DATA)
 finally:
     shutil.rmtree(BASE, ignore_errors=True)
 

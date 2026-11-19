@@ -9,7 +9,8 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
-from lectures import plan_sections, resolve_jobs, target_paths  # noqa: E402
+from lectures import (effective_segments, plan_sections, resolve_jobs,  # noqa: E402
+                     resolve_segments, target_paths)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -91,6 +92,17 @@ try:
     check("非法值回落默认", resolve_jobs("x"), 2)
     check("环境变量生效", resolve_jobs("", {"GETLEC_JOBS": "3"}), 3)
     check("参数优先于环境", resolve_jobs("1", {"GETLEC_JOBS": "3"}), 1)
+
+    # ---------- 单文件分段数 ----------
+    check("分段默认关闭", resolve_segments(""), 1)
+    check("分段 4 段", resolve_segments("4"), 4)
+    check("分段超过上限收敛到 8", resolve_segments("99"), 8)
+    check("分段环境变量", resolve_segments("", {"GETLEC_SEGMENTS": "4"}), 4)
+    check("分段非法值回落 1", resolve_segments("x"), 1)
+    check("节级 1 路 + 4 段 -> 4", effective_segments("4", 1), 4)
+    check("节级 2 路 + 4 段 -> 4", effective_segments("4", 2), 4)
+    check("节级 4 路 + 4 段 -> 2", effective_segments("4", 4), 2)
+    check("节级 3 路 + 8 段 -> 2", effective_segments("8", 3), 2)
 finally:
     shutil.rmtree(BASE, ignore_errors=True)
 

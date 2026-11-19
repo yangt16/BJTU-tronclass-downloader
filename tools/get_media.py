@@ -10,11 +10,16 @@ get_media.py - 分块下载 + 请求头基线。
   * 失败只重下那一块（指数退避，最多 6 次）
   * 进度可见
 """
+import json
+import os
 import re
 import ssl
+import sys
+import threading
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 BASE_HEADERS = {
@@ -86,11 +91,130 @@ def resolve(url, timeout=40):
     return url
 
 
-def download(url, out_path, quiet=False):
+SEG_MAX = 8          # 单文件最多拆几段
+SEG_CONN_MAX = 8     # 节级并发 × 分段数 的连接总数上限
+
+
+def seg_state_path(out):
+    """分段进度旁路文件：X.mp4.segstate（下完会删掉）。"""
+    return out.parent / (out.name + ".segstate")
+
+
+def _save_state(path, state):
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(state), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def download_segmented(url, out_path, segments=4, quiet=False):
+    """同一个文件用多个连接分段下载；各段写各自的字节区间，下完就是完整文件。
+
+    进度存在 X.mp4.segstate 里：中途中断后重跑会从各段的断点继续。
+    """
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    state_path = seg_state_path(out)
+
+    ok, total, err = probe(url)
+    if not ok:
+        raise RuntimeError(f"无法访问媒体地址: {err}")
+    if out.exists() and out.stat().st_size == total and not state_path.exists():
+        if not quiet:
+            print("已经下完，跳过")
+        return out
+
+    n = max(1, min(int(segments), SEG_MAX))
+    per = (total + n - 1) // n
+    state = {"total": total, "n": n, "done": [0] * n}
+    if state_path.exists():
+        try:
+            old = json.loads(state_path.read_text(encoding="utf-8"))
+            if (old.get("total") == total and old.get("n") == n
+                    and len(old.get("done", [])) == n):
+                state = old
+                if not quiet:
+                    print(f"[seg] 接着上次的分段进度（已下 {sum(state['done'])/1e6:.1f} MB）")
+        except Exception:
+            pass
+
+    with open(out, "ab") as fh:
+        fh.truncate(total)      # 预占位，避免各段互相扩文件
+
+    lock = threading.Lock()
+    progress = {"bytes": sum(state["done"])}
+    t0 = time.time()
+
+    def report():
+        if quiet:
+            return
+        done = progress["bytes"]
+        el = time.time() - t0
+        print(f"  {done/1e6:8.1f}/{total/1e6:.1f} MB  {done/total*100:5.1f}%"
+              f"  {done/el/1e6 if el else 0:5.1f} MB/s", end="\r", flush=True)
+
+    def worker(i):
+        start = i * per
+        end = min(total, start + per)
+        fh = open(out, "r+b", buffering=0)
+        try:
+            pos = start + state["done"][i]
+            fh.seek(pos)
+            while pos < end:
+                chunk_end = min(pos + CHUNK - 1, end - 1)
+                h = dict(BASE_HEADERS, Range=f"bytes={pos}-{chunk_end}")
+                data = b""
+                for attempt in range(6):
+                    try:
+                        r = urllib.request.urlopen(
+                            urllib.request.Request(url, headers=h),
+                            timeout=120, context=CTX)
+                        data = r.read()
+                        break
+                    except Exception as ex:
+                        if attempt == 5:
+                            raise RuntimeError(f"第 {i+1} 段 {pos} 字节处连续失败: {ex}")
+                        if not quiet:
+                            with lock:
+                                print(f"\n  第 {i+1} 段重试 {attempt+1}/5: {type(ex).__name__}")
+                        time.sleep(2 * (attempt + 1))
+                if not data:
+                    raise RuntimeError(f"第 {i+1} 段读到 0 字节（{pos}）")
+                fh.write(data)
+                pos += len(data)
+                with lock:
+                    state["done"][i] = pos - start
+                    progress["bytes"] += len(data)
+                    _save_state(state_path, state)
+                    report()
+        finally:
+            fh.close()
+
+    if not quiet:
+        print(f"总长 {total/1e6:.1f} MB  分 {n} 段并发下载")
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        list(pool.map(worker, range(n)))
+
+    size = out.stat().st_size
+    if size != total:
+        raise RuntimeError(f"下载后大小不对: {size} != {total}")
+    try:
+        state_path.unlink()
+    except Exception:
+        pass
+    if not quiet:
+        print()
+        print(f"完成 {out}  {size/1e6:.1f} MB  用时 {time.time()-t0:.0f}s（{n} 段）")
+    return out
+
+
+def download(url, out_path, quiet=False, segments=1):
     """按块下载到 out_path，已存在的部分会续传。
 
     quiet=True 时不打印进度（多节并发下载时用，避免输出互相踩）。
+    segments>1 时走单文件多连接分段下载。
     """
+    if segments and int(segments) > 1:
+        return download_segmented(url, out_path, int(segments), quiet=quiet)
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 

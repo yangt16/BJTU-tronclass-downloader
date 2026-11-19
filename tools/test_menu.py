@@ -46,6 +46,7 @@ base_with_leftover = {"GETLEC_ONLY": "20261030", "GETLEC_DROPVIDEO": "1",
 env = menu.build_env("1", "1")
 check("默认不设模式变量", "GETLEC_DROPVIDEO" in env or "GETLEC_NOAUDIO" in env, False)
 check("默认并发 2 路", env.get("GETLEC_JOBS"), "2")
+check("默认单节分段关闭", env.get("GETLEC_SEGMENTS"), "1")
 check("默认不设筛选变量", "GETLEC_ONLY" in env or "GETLEC_EXCLUDE" in env, False)
 
 env = menu.build_env("2", "1")
@@ -66,10 +67,14 @@ check("排除星期 -> EXCLUDE", env.get("GETLEC_EXCLUDE"), "2")
 env = menu.build_env("1", "1", jobs="4")
 check("并发 4 路 -> GETLEC_JOBS", env.get("GETLEC_JOBS"), "4")
 
+env = menu.build_env("1", "1", seg="4")
+check("单节加速 4 段 -> GETLEC_SEGMENTS", env.get("GETLEC_SEGMENTS"), "4")
+
 env = menu.build_env("1", "1", base=base_with_leftover)
 check("清掉上次残留 ONLY", "GETLEC_ONLY" in env, False)
 check("清掉上次残留 DROPVIDEO", "GETLEC_DROPVIDEO" in env, False)
 check("残留 JOBS 被覆盖为默认", env.get("GETLEC_JOBS"), "2")
+check("残留 SEGMENTS 被覆盖为默认", env.get("GETLEC_SEGMENTS"), "1")
 check("保留无关变量", env.get("PATH"), "x")
 
 # ---------- 摘要文案 ----------
@@ -78,6 +83,7 @@ check("摘要 周四", menu.describe("1", "3", "4"), ("视频 + 音频", "只下
 check("摘要 排除周二周四", menu.describe("2", "4", "2,4"), ("只要音频", "排除 周二,周四"))
 check("摘要 某天", menu.describe("3", "2", "20261030"), ("只要视频", "只下 20261030"))
 check("并发文案表", menu.JOBS_CN, {"1": "1 路", "2": "2 路", "3": "3 路", "4": "4 路"})
+check("分段文案表", menu.SEG_CN, {"1": "关闭", "4": "4 段"})
 
 print()
 print("全部通过" if bad == 0 else f"{bad} 项失败")

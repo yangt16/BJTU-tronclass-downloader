@@ -3,7 +3,8 @@
 #
 # Same engine as getlec.cmd, just POSIX shell. Modes come from the same
 # environment variables: GETLEC_DROPVIDEO / GETLEC_NOAUDIO / GETLEC_ONLY /
-# GETLEC_EXCLUDE / GETLEC_JOBS / GETLEC_FORCE / GETLEC_KEEPLIST / GETLEC_DRYRUN.
+# GETLEC_EXCLUDE / GETLEC_JOBS / GETLEC_SEGMENTS / GETLEC_FORCE /
+# GETLEC_KEEPLIST / GETLEC_DRYRUN.
 #
 # usage (run from the project root):
 #   sh tools/getlec.sh                 everything in lists/
@@ -46,6 +47,7 @@ ARGS=""
 [ -n "${GETLEC_ONLY:-}" ] && ARGS="$ARGS --only $GETLEC_ONLY"
 [ -n "${GETLEC_EXCLUDE:-}" ] && ARGS="$ARGS --exclude $GETLEC_EXCLUDE"
 [ -n "${GETLEC_JOBS:-}" ] && ARGS="$ARGS --jobs $GETLEC_JOBS"
+[ -n "${GETLEC_SEGMENTS:-}" ] && ARGS="$ARGS --segments $GETLEC_SEGMENTS"
 
 FIRST="${1:-}"
 TRACK="${2:-ENCODER}"

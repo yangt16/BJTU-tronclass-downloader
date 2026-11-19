@@ -70,6 +70,9 @@ check("并发 4 路 -> GETLEC_JOBS", env.get("GETLEC_JOBS"), "4")
 env = menu.build_env("1", "1", seg="4")
 check("单节加速 4 段 -> GETLEC_SEGMENTS", env.get("GETLEC_SEGMENTS"), "4")
 
+env = menu.build_env("1", "1", seg="8")
+check("单节加速 8 段 -> GETLEC_SEGMENTS", env.get("GETLEC_SEGMENTS"), "8")
+
 env = menu.build_env("1", "1", base=base_with_leftover)
 check("清掉上次残留 ONLY", "GETLEC_ONLY" in env, False)
 check("清掉上次残留 DROPVIDEO", "GETLEC_DROPVIDEO" in env, False)
@@ -83,7 +86,8 @@ check("摘要 周四", menu.describe("1", "3", "4"), ("视频 + 音频", "只下
 check("摘要 排除周二周四", menu.describe("2", "4", "2,4"), ("只要音频", "排除 周二,周四"))
 check("摘要 某天", menu.describe("3", "2", "20261030"), ("只要视频", "只下 20261030"))
 check("并发文案表", menu.JOBS_CN, {"1": "1 路", "2": "2 路", "3": "3 路", "4": "4 路"})
-check("分段文案表", menu.SEG_CN, {"1": "关闭", "4": "4 段"})
+check("分段文案表", menu.SEG_CN, {"1": "关闭", "4": "4 段", "8": "8 段"})
+check("分段菜单序号映射", menu.SEG_MAP, {"1": "1", "2": "4", "3": "8"})
 
 print()
 print("全部通过" if bad == 0 else f"{bad} 项失败")

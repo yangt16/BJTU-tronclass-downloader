@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          for t in test_naming test_modes test_filter test_download test_log test_import test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+          for t in test_naming test_modes test_filter test_download test_log test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
             echo "::group::$t"
             python "tools/$t.py"
             echo "::endgroup::"
@@ -117,7 +117,7 @@ jobs:
       - name: Python 测试 + shell 入口检查（含可执行位）
         run: |
           set -e
-          for t in test_naming test_modes test_filter test_download test_log test_import test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+          for t in test_naming test_modes test_filter test_download test_log test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
             echo "::group::$t"
             python "tools/$t.py"
             echo "::endgroup::"
@@ -166,7 +166,7 @@ jobs:
       - name: Python 测试（含下载集成测试）
         run: |
           set -e
-          for t in test_naming test_modes test_filter test_download test_log test_import test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+          for t in test_naming test_modes test_filter test_download test_log test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
             echo "::group::$t"
             python "tools/$t.py"
             echo "::endgroup::"

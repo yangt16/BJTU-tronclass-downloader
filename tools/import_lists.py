@@ -1,17 +1,12 @@
 r"""
-import_lists.py - 把抓取清单收编进 lists\\，用户不用手动复制。
+import_lists.py - 把浏览器下载的抓取清单自动搬进 lists\\。
 
-收编三类来源：
-  1. 下载文件夹 / 桌面里的抓取 txt（scrape_course.js 导出，含 previewToken）
-  2. lists\\ 里形如 "课程名 (1).txt" 的副本
-     （手动复制到 lists 时 Windows 会问是否替换；选"保留两份"就会产生这个）
-  3. 同名清单按 URL 去重合并 —— 老地址不会丢，新地址追加在后
-
-抓取导出的清单本身是全量的，所以合并后不会丢节次。
+scrape_course.js 在浏览器里导出 <课程名>.txt 到「下载」文件夹，
+本脚本负责把它合并进 lists\\<课程名>.txt（已存在则按 URL 去重合并）。
 
 用法:
-    python import_lists.py                 # 扫下载 + 桌面 + lists 里的副本
-    python import_lists.py --downloads D:\some\dir   # 只扫指定目录（测试用）
+    python import_lists.py                 # 扫默认下载文件夹
+    python import_lists.py --downloads D:\some\dir
     python import_lists.py --dry-run       # 只看会做什么
 """
 import argparse
@@ -27,19 +22,15 @@ except Exception:
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LISTS = ROOT / "lists"
-DUP_SUFFIX = re.compile(r"\s*\(\d+\)$")     # 浏览器/资源管理器重名会存成 "X (1).txt"
+DUP_SUFFIX = re.compile(r"\s*\(\d+\)$")     # 浏览器重名会存成 "X (1).txt"
 
 
-def scan_dirs(explicit=""):
-    """默认扫「下载」和「桌面」；--downloads 指定时只扫那一个。"""
-    if explicit:
-        return [pathlib.Path(explicit)]
-    home = pathlib.Path(os.path.expanduser("~"))
-    return [d for d in (home / "Downloads", home / "Desktop") if d.exists()]
+def default_downloads():
+    return pathlib.Path(os.path.expanduser("~")) / "Downloads"
 
 
 def is_scraped(path):
-    """认得出是抓取脚本导出的文件：内容里含 previewToken。"""
+    """认得出是我们抓取脚本导出的文件：含 previewToken，或首行带自动抓取标记。"""
     try:
         head = path.read_text(encoding="utf-8-sig", errors="replace")[:4000]
     except Exception:
@@ -53,71 +44,47 @@ def urls_of(text):
             and ln.strip().lower().startswith("http")]
 
 
-def merge_one(src, name, dry_run=False):
-    """把 src 的地址合并进 lists\\<name>.txt。返回 True 表示有动作。"""
-    dest = LISTS / f"{name}.txt"
-    new_urls = urls_of(src.read_text(encoding="utf-8-sig", errors="replace"))
-    if not new_urls:
-        return False
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--downloads", default="")
+    ap.add_argument("--dry-run", action="store_true")
+    a = ap.parse_args()
 
-    existing = []
-    if dest.exists():
-        existing = urls_of(dest.read_text(encoding="utf-8-sig", errors="replace"))
-    merged = existing + [u for u in new_urls if u not in existing]
+    dl = pathlib.Path(a.downloads) if a.downloads else default_downloads()
+    if not dl.exists():
+        return 0
+    LISTS.mkdir(exist_ok=True)
 
-    same = src.name == dest.name
-    print(f"[import] {src.name} -> {dest.name}"
-          f"（新增 {len(merged) - len(existing)} 条，共 {len(merged)} 条）"
-          + ("  [覆盖同名]" if same else ""))
-    if dry_run:
-        return True
+    moved = 0
+    for src in sorted(dl.glob("*.txt")):
+        if not is_scraped(src):
+            continue
+        name = DUP_SUFFIX.sub("", src.stem).strip() or "course"
+        dest = LISTS / f"{name}.txt"
+        new_urls = urls_of(src.read_text(encoding="utf-8-sig", errors="replace"))
+        if not new_urls:
+            continue
 
-    header = (f"# {name} · 由 import_lists.py 合并\n"
-              f"# 每行一条地址；previewToken 地址会在下载时自动换成直链\n")
-    dest.write_text(header + "\n".join(merged) + "\n", encoding="utf-8")
-    if src.resolve() != dest.resolve():
+        existing = []
+        if dest.exists():
+            existing = urls_of(dest.read_text(encoding="utf-8-sig", errors="replace"))
+        merged = existing + [u for u in new_urls if u not in existing]
+
+        print(f"[import] {src.name} -> {dest.name}"
+              f"（新增 {len(merged)-len(existing)} 条，共 {len(merged)} 条）")
+        if a.dry_run:
+            continue
+        header = (f"# {name} · 由 import_lists.py 合并\n"
+                  f"# 每行一条地址；previewToken 地址会在下载时自动换成直链\n")
+        dest.write_text(header + "\n".join(merged) + "\n", encoding="utf-8")
         try:
             src.unlink()          # 搬走而不是留副本，避免下次重复导入
         except Exception:
             pass
-    return True
+        moved += 1
 
-
-def run(dirs, dry_run=False):
-    LISTS.mkdir(exist_ok=True)
-    moved = 0
-
-    # 1) 下载文件夹 / 桌面
-    for d in dirs:
-        if not d.exists():
-            continue
-        for src in sorted(d.glob("*.txt")):
-            if not is_scraped(src):
-                continue
-            name = DUP_SUFFIX.sub("", src.stem).strip() or "course"
-            if merge_one(src, name, dry_run):
-                moved += 1
-
-    # 2) lists\ 里的 "X (1).txt" 副本（手动复制时选了保留两份）
-    for src in sorted(LISTS.glob("*.txt")):
-        if not DUP_SUFFIX.search(src.stem):
-            continue
-        name = DUP_SUFFIX.sub("", src.stem).strip() or "course"
-        if merge_one(src, name, dry_run):
-            moved += 1
-
-    return moved
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--downloads", default="", help="只扫这个目录（测试/自定义用）")
-    ap.add_argument("--dry-run", action="store_true")
-    a = ap.parse_args()
-
-    moved = run(scan_dirs(a.downloads), a.dry_run)
     if moved:
-        print(f"[import] 共收编 {moved} 份清单")
+        print(f"[import] 共导入 {moved} 份清单")
     return 0
 
 

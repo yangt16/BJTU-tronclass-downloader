@@ -40,12 +40,26 @@
 git clone --depth 1 https://github.com/yangt16/tronclass-downloader.git && cd tronclass-downloader && setup.cmd
 ```
 
-### 方式 3：没有 Git
+### 方式 3：没有 Git（Windows）
 
 浏览器打开仓库页 → `Code` → `Download ZIP` → 解压 → 双击 `setup.cmd`
 （这个包不含 ffmpeg，setup 会下载约 200 MB）。
 
-**前置条件**：Windows + Python 3.8+（没有就先装，或把免安装版解压成 `python\`）。
+### 方式 4：macOS / Linux
+
+```sh
+git clone --depth 1 https://github.com/yangt16/tronclass-downloader.git
+cd tronclass-downloader
+brew install ffmpeg python        # Linux: apt install ffmpeg python3
+chmod +x *.command *.sh           # 从 ZIP 解压时需要
+./setup.command
+```
+
+之后双击 `.command` 文件即可（Finder 里就是四个中文名字的入口）。
+**注意**：Release 里的 win64 压缩包只适用于 Windows。
+
+**前置条件**：Windows / macOS / Linux + Python 3.8+；
+Windows 的 ffmpeg 由 `setup.cmd` 自动下载，macOS/Linux 用包管理器装。
 
 ---
 
@@ -65,11 +79,14 @@ D:\course-notes\lists\XX课程.txt
 
 ### 2. 双击三个入口之一
 
-| 入口 | 产物 | 单节占用 |
+Windows 用 `.cmd`，macOS 用同名的 `.command`：
+
+| 入口（Windows / macOS） | 产物 | 单节占用 |
 |---|---|---|
-| **下视频和音频.cmd** | mp4 + m4a（默认） | ~750 MB |
-| **只要音轨.cmd** | 只留 m4a | ~110 MB |
-| **只要视频.cmd** | 只留 mp4 | ~640 MB |
+| **下视频和音频.cmd / .command** | mp4 + m4a（默认） | ~750 MB |
+| **只要音轨.cmd / .command** | 只留 m4a | ~110 MB |
+| **只要视频.cmd / .command** | 只留 mp4 | ~640 MB |
+| **只下某一天.cmd / .command** | 问你要哪一天，只下那天（产物按上面选） | — |
 | **只下某一天.cmd** | 问你要哪一天，只下那天（产物按上面选） | — |
 
 前三个都支持"双击跑全部清单"和"拖一个 txt 进去只跑它"。
@@ -105,7 +122,7 @@ media\XX课程\20260921\
 | 依赖 | 状态 |
 |---|---|
 | Python 3.8+ | 需要（自动探测：`python\python.exe` → PATH 的 `python` → `py -3`） |
-| ffmpeg | **首次使用双击 `setup.cmd` 自动下载**（约 200 MB，装进 `bin\`），也可以手动放 |
+| ffmpeg | Windows：双击 `setup.cmd` 自动下载（约 200 MB，装进 `bin\`）；macOS/Linux：`brew install ffmpeg` / `apt install ffmpeg` |
 | 网络 | 能直连校内 TronClass，不需要 VPN |
 
 > 第一次用（或换了新机器）：双击 **`setup.cmd`** —— 它会找 Python、下载 ffmpeg、建好 `lists\`。
@@ -122,11 +139,16 @@ D:\course-notes\
 ├─ 下视频和音频.cmd       ★ 入口：视频 + 音轨
 ├─ 只要音轨.cmd           ★ 入口：只留 m4a
 ├─ 只要视频.cmd           ★ 入口：只留 mp4
-├─ 只下某一天.cmd          ★ 入口：按日期筛选
-├─ getlec.cmd             主脚本（各入口都调用它）
+├─ 只下某一天.cmd          ★ 入口：按日期筛选（Windows）
+├─ setup.command           ★ 入口：macOS / Linux 首次设置
+├─ 下视频和音频.command     ★ 入口：macOS / Linux
+├─ 只要音轨.command
+├─ 只要视频.command
+├─ 只下某一天.command
+├─ getlec.cmd / getlec.sh  主脚本（各入口都调用它）
 ├─ docs\使用说明.md       完整使用手册
 ├─ bin\                   ffmpeg / ffprobe
-├─ tools\                 17 个脚本（下载、编排、抓取、测试）
+├─ tools\                 18 个脚本（下载、编排、抓取、测试）
 ├─ dist\                  抓取书签（install.html 拖拽安装）
 ├─ lists\                 ★ 在这里建 <科目>.txt
 ├─ media\                 ★ 下载产物

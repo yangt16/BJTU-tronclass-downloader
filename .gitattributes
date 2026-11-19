@@ -5,3 +5,7 @@
 # Python / Markdown 统一 LF
 *.py   text eol=lf
 *.md   text eol=lf
+
+# shell 脚本必须 LF（CRLF 会让 macOS 报 bad interpreter）
+*.sh text eol=lf
+*.command text eol=lf

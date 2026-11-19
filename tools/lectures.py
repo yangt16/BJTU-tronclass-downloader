@@ -334,6 +334,13 @@ def main():
                     help="跳过指定的日期/标签，写法同 --only")
     a = ap.parse_args()
 
+    # 缺 ffmpeg 时直接给一句人话，而不是等抽音轨阶段抛 FileNotFoundError
+    if not (FFMPEG.exists() or shutil.which("ffmpeg")):
+        print("[error] 没找到 ffmpeg，抽音轨需要它：")
+        print("        macOS : brew install ffmpeg")
+        print("        Windows: 双击 setup.cmd 自动下载")
+        return 1
+
     # 落点由清单文件名决定：lists\X.txt -> media\X\
     outdir = resolve_outdir(a, a.urls)
     print(f"[dest] 落点: {outdir}")

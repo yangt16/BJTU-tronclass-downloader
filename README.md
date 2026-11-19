@@ -1,5 +1,8 @@
 # 课程回放下载器
 
+[![CI](https://github.com/yangt16/BJTU-tronclass-downloader/actions/workflows/ci.yml/badge.svg)](https://github.com/yangt16/BJTU-tronclass-downloader/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 把 TronClass 的课堂回放**批量下载到本地**，并自动抽出音轨（`mp4` + `m4a`）。
 
 > 用途很窄：**只负责拿到文件**。转写、总结、考点提取都不在这个程序里。

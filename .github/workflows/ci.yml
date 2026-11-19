@@ -18,9 +18,9 @@ jobs:
   test-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          for t in test_naming test_modes test_filter test_download test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+          for t in test_naming test_modes test_filter test_download test_log test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
             echo "::group::$t"
             python "tools/$t.py"
             echo "::endgroup::"
@@ -52,6 +52,7 @@ jobs:
           $env:PATH = "$PWD\tmp\fakebin;$env:PATH"
           $env:GETLEC_DRYRUN = '1'
           $env:GETLEC_NOPAUSE = '1'
+          $env:GETLEC_LOG = '1'
 
           $out = & '.\1-下视频和音频.cmd' 'lists\ci.txt' 2>&1 | Out-String
           Write-Host $out
@@ -62,13 +63,18 @@ jobs:
           Write-Host $out2
           if ($out2 -notmatch '\[filter\]') { throw 'day entry: no [filter] line' }
 
+          if (-not (Get-ChildItem logs\*.log -ErrorAction SilentlyContinue)) {
+            throw 'log: no file written'
+          }
+          Write-Host (Get-ChildItem logs\*.log | ForEach-Object Name)
+
   # ---------------- macOS ----------------
   test-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -97,19 +103,21 @@ jobs:
           set -e
           mkdir -p lists
           printf '%s\n' "$CI_FAKE_URL" > "lists/ci smoke.txt"
-          export GETLEC_DRYRUN=1 GETLEC_NOPAUSE=1
+          export GETLEC_DRYRUN=1 GETLEC_NOPAUSE=1 GETLEC_LOG=1
           out=$(sh "./1-下视频和音频.command" "lists/ci smoke.txt" 2>&1)
           echo "$out"
           echo "$out" | grep -q "\[mode\] 视频 + 音轨"
           echo "$out" | grep -q "节:"
+          ls logs/*.log >/dev/null
           out2=$(printf '20261111\n' | sh "./4-只下某一天.command" "lists/ci smoke.txt" 2>&1)
           echo "$out2"
           echo "$out2" | grep -q "\[filter\]"
+          ls logs/*.log >/dev/null
 
       - name: Python 测试 + shell 入口检查（含可执行位）
         run: |
           set -e
-          for t in test_naming test_modes test_filter test_download test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+          for t in test_naming test_modes test_filter test_download test_log test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
             echo "::group::$t"
             python "tools/$t.py"
             echo "::endgroup::"
@@ -129,9 +137,9 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.11"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -148,16 +156,17 @@ jobs:
           chmod +x tmp/fakebin/ffmpeg
           export PATH="$PWD/tmp/fakebin:$PATH"
           printf '%s\n' "$CI_FAKE_URL" > lists/ci.txt
-          export GETLEC_DRYRUN=1 GETLEC_NOPAUSE=1
+          export GETLEC_DRYRUN=1 GETLEC_NOPAUSE=1 GETLEC_LOG=1
           out=$(sh ./1-下视频和音频.command lists/ci.txt 2>&1)
           echo "$out"
           echo "$out" | grep -q "\[mode\] 视频 + 音轨"
           echo "$out" | grep -q "节:"
+          ls logs/*.log >/dev/null
 
       - name: Python 测试（含下载集成测试）
         run: |
           set -e
-          for t in test_naming test_modes test_filter test_download test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+          for t in test_naming test_modes test_filter test_download test_log test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
             echo "::group::$t"
             python "tools/$t.py"
             echo "::endgroup::"
@@ -167,9 +176,9 @@ jobs:
   package-mac:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 

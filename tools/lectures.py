@@ -16,6 +16,7 @@ import argparse
 import pathlib
 import re
 import shutil
+import os
 import subprocess
 import sys
 import time
@@ -30,6 +31,53 @@ except Exception:
 
 # ROOT = tools/ 的父目录。整套东西可搬到任意位置而不用改代码。
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+
+class _Tee:
+    """把输出同时写到控制台和日志文件。"""
+
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, s):
+        for st in self.streams:
+            try:
+                st.write(s)
+                st.flush()
+            except Exception:
+                pass
+        return len(s)
+
+    def flush(self):
+        for st in self.streams:
+            try:
+                st.flush()
+            except Exception:
+                pass
+
+    def isatty(self):
+        return False
+
+
+def fmt_dur(sec):
+    """秒数 -> 1h02m / 3m05s / 42s。"""
+    sec = int(max(0, sec))
+    h, rem = divmod(sec, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}h{m:02d}m"
+    if m:
+        return f"{m}m{s:02d}s"
+    return f"{s}s"
+
+
+def pick_log_dir(arg):
+    """--log 参数 / GETLEC_LOG=1 环境变量 -> 日志目录（None = 不写日志）。"""
+    if arg:
+        return pathlib.Path(arg)
+    if os.environ.get("GETLEC_LOG") == "1":
+        return ROOT / "logs"
+    return None
 
 
 def _exe(name):
@@ -332,6 +380,8 @@ def main():
                     help="只下指定的日期/标签，可重复或用逗号分隔，如 20261030 或 20261030_10")
     ap.add_argument("--exclude", action="append", default=[], metavar="日期",
                     help="跳过指定的日期/标签，写法同 --only")
+    ap.add_argument("--log", default="", metavar="DIR",
+                    help="把输出同时写进 DIR 下的日志文件（也可设 GETLEC_LOG=1 用默认 logs/）")
     a = ap.parse_args()
 
     # 缺 ffmpeg 时直接给一句人话，而不是等抽音轨阶段抛 FileNotFoundError
@@ -343,7 +393,24 @@ def main():
 
     # 落点由清单文件名决定：lists\X.txt -> media\X\
     outdir = resolve_outdir(a, a.urls)
+
+    # 可选：输出同时写进日志文件（长任务跑完还能回看）。
+    # 要在第一条输出之前装好，否则日志会漏掉开头几行。
+    log_fh = None
+    log_dir = pick_log_dir(a.log)
+    if log_dir is not None:
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = log_dir / f"{outdir.name}_{time.strftime('%Y%m%d_%H%M%S')}.log"
+            log_fh = open(log_file, "w", encoding="utf-8", newline="\n", buffering=1)
+            sys.stdout = _Tee(sys.stdout, log_fh)
+            sys.stderr = _Tee(sys.stderr, log_fh)
+        except Exception as e:
+            print(f"[log] 无法写日志: {e}")
+
     print(f"[dest] 落点: {outdir}")
+    if log_fh:
+        print(f"[log] 同时写入 {log_fh.name}")
 
     urls = load_urls(a.urls)
     if not urls:
@@ -452,12 +519,18 @@ def main():
         done_dates.append(date)
         return "new"
 
-    # 第一轮
+    # 第一轮（带整体进度与预计剩余时间）
     items = list(groups.items())
     retry_queue = []
+    t_start = time.time()
     for idx, (label, us) in enumerate(items, 1):
         if process(label, us, idx, len(items)) == "failed":
             retry_queue.append((label, us))
+        if not a.dry_run and idx < len(items):
+            elapsed = time.time() - t_start
+            eta = elapsed / idx * (len(items) - idx)
+            print(f"[进度] {idx}/{len(items)} 节  已用 {fmt_dur(elapsed)}"
+                  f"  预计剩余 {fmt_dur(eta)}")
 
     # 失败节自动重试一轮（网络抖动很常见，一次就放弃太亏）
     retried = 0
@@ -472,12 +545,16 @@ def main():
 
     failed = len(retry_queue)
     if not a.dry_run:
-        print(f"\n[小结] 新下载 {counters['new']} 节 / 跳过 {counters['skip']} 节 / 失败 {failed} 节")
+        print(f"\n[小结] 新下载 {counters['new']} 节 / 跳过 {counters['skip']} 节 /"
+              f" 失败 {failed} 节  用时 {fmt_dur(time.time() - t_start)}")
         if retried:
             print(f"[retry] {retried} 节重试，其中 {retried - failed} 节成功")
 
     if a.dry_run or failed or not done_dates:
         return 1 if failed else 0
+
+    if log_fh:
+        log_fh.flush()
 
     if a.keep_list:
         # 增量清单模式：清单原地保留，方便下周把新地址追加进来

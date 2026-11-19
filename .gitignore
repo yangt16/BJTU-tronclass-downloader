@@ -9,6 +9,7 @@ har_archive/
 lists/*.txt
 
 # ---- 生成物 / 临时 ----
+logs/
 tmp/
 lists/*.md
 __pycache__/

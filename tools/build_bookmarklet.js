@@ -28,6 +28,18 @@ const url = 'javascript:' + encodeURIComponent(code)
 fs.mkdirSync(DIST, { recursive: true });
 fs.writeFileSync(path.join(DIST, 'bookmarklet.txt'), url + '\n', 'utf8');
 
+// Chrome 里拖拽 javascript: 链接经常丢协议头或被拦；改成"导入书签文件"最稳。
+// 这是 Netscape 书签格式，Chrome / Edge / Safari 都认。
+const bookmarksHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+    <DT><A HREF="${url}" ADD_DATE="${Math.floor(Date.now()/1000)}">抓取课程清单</A>
+</DL><p>
+`;
+fs.writeFileSync(path.join(DIST, 'bookmarks.html'), bookmarksHtml, 'utf8');
+
 const html = `<!doctype html>
 <html lang="zh-CN">
 <meta charset="utf-8">
@@ -72,6 +84,15 @@ const html = `<!doctype html>
   只会把「回放地址」写进一个本地 txt 文件。
 </div>
 
+<div class="note warn">
+  <b>Chrome / Edge 用户（如果拖拽后点击没反应）：</b><br>
+  拖拽容易丢掉 <code>javascript:</code> 前缀。改用书签导入，稳得多：<br>
+  1. Chrome 打开 <code>chrome://bookmarks</code>（Edge 是 <code>edge://favorites</code>）<br>
+  2. 右上角 <b>⋮</b> → <b>导入书签</b>（Edge：… → 导入收藏夹）<br>
+  3. 选本文件夹里的 <code>dist/bookmarks.html</code><br>
+  4. 书签栏里会出现「抓取课程清单」，去课程页点它即可
+</div>
+
 <p style="color:#57606a;font-size:14px;margin-top:32px">
   如果拖拽没反应，也可以：新建一个书签，名字随便填，<b>网址</b>粘贴 <code>dist/bookmarklet.txt</code> 里的那一整行。
 </p>
@@ -83,6 +104,7 @@ const kb = (s) => (Buffer.byteLength(s, 'utf8') / 1024).toFixed(1) + ' KB';
 console.log('源码      : ' + kb(code) + ' -> javascript: 地址 ' + kb(url));
 console.log('书签地址  : ' + path.join(DIST, 'bookmarklet.txt'));
 console.log('安装页    : ' + path.join(DIST, 'install.html'));
+console.log('Chrome 书签: ' + path.join(DIST, 'bookmarks.html') + '   (书签管理器 -> 导入)');
 if (Buffer.byteLength(url) > 60 * 1024) {
   console.warn('警告：书签长度超过 60 KB，部分浏览器可能截断');
 }

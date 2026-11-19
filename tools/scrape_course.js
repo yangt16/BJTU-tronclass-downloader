@@ -122,5 +122,5 @@
   a.remove();
 
   console.log(`[scrape] 完成：${rows.length} 节 -> ${course}.txt`);
-  alert(`已导出 ${rows.length} 节到「下载」文件夹的 ${course}.txt\n\n接下来双击 1-下视频和音频.cmd 即可自动开始下载。`);
+  alert(`已导出 ${rows.length} 节到「下载」文件夹的 ${course}.txt\n\n接下来双击 1-下视频和音频.cmd 即可自动开始下载。\n不用手动复制到 lists 文件夹——程序会自动收编。`);
 })();

@@ -119,7 +119,8 @@ media\XX课程\20260921\
    - **Chrome**：拖拽容易丢 `javascript:` 前缀，改用导入 ——
      打开 `chrome://bookmarks` → 右上 `⋮` → **导入书签** → 选 `dist\bookmarks.html`
 3. 打开课程的「直播」列表页 → 点一下书签 → 清单自动下载
-4. 双击下载入口（会自动收编清单并开始下载）
+4. 双击下载入口 —— **不用手动复制清单**：
+   程序会自动从「下载」/「桌面」收编，按 URL 去重合并
 
 原理与接口细节见 [使用说明 · 自动版](docs/使用说明.md#自动版书签一次抓一门课)。
 
@@ -158,7 +159,7 @@ D:\course-notes\
 ├─ LICENSE                    MIT 许可证
 ├─ CHANGELOG.md               版本更新日志
 ├─ bin\                       ffmpeg / ffprobe
-├─ tools\                     23 个脚本（下载、编排、抓取、测试）
+├─ tools\                     24 个脚本（下载、编排、抓取、测试）
 │  ├─ getlec.cmd / getlec.sh  主脚本（各入口都调用它）
 │  └─ ...                     其余工具与测试
 ├─ dist\                      抓取书签（install.html / bookmarks.html）

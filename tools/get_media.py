@@ -86,8 +86,11 @@ def resolve(url, timeout=40):
     return url
 
 
-def download(url, out_path):
-    """按块下载到 out_path，已存在的部分会续传。"""
+def download(url, out_path, quiet=False):
+    """按块下载到 out_path，已存在的部分会续传。
+
+    quiet=True 时不打印进度（多节并发下载时用，避免输出互相踩）。
+    """
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -98,9 +101,11 @@ def download(url, out_path):
     if have > total:
         out.unlink()
         have = 0
-    print(f"总长 {total/1e6:.1f} MB  已有 {have/1e6:.1f} MB")
+    if not quiet:
+        print(f"总长 {total/1e6:.1f} MB  已有 {have/1e6:.1f} MB")
     if have == total:
-        print("已经下完，跳过")
+        if not quiet:
+            print("已经下完，跳过")
         return out
 
     t0 = time.time()
@@ -118,12 +123,15 @@ def download(url, out_path):
                 except Exception as ex:
                     if attempt == 5:
                         raise RuntimeError(f"第 {have} 字节处连续失败: {ex}")
-                    print(f"  重试 {attempt+1}/5: {type(ex).__name__} {str(ex)[:60]}")
+                    if not quiet:
+                        print(f"  重试 {attempt+1}/5: {type(ex).__name__} {str(ex)[:60]}")
                     time.sleep(2 * (attempt + 1))
             have = out.stat().st_size
-            el = time.time() - t0
-            print(f"  {have/1e6:8.1f}/{total/1e6:.1f} MB  {have/total*100:5.1f}%"
-                  f"  {have/el/1e6 if el else 0:5.1f} MB/s", end="\r", flush=True)
-    print()
-    print(f"完成 {out}  {out.stat().st_size/1e6:.1f} MB  用时 {time.time()-t0:.0f}s")
+            if not quiet:
+                el = time.time() - t0
+                print(f"  {have/1e6:8.1f}/{total/1e6:.1f} MB  {have/total*100:5.1f}%"
+                      f"  {have/el/1e6 if el else 0:5.1f} MB/s", end="\r", flush=True)
+    if not quiet:
+        print()
+        print(f"完成 {out}  {out.stat().st_size/1e6:.1f} MB  用时 {time.time()-t0:.0f}s")
     return out

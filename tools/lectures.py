@@ -21,7 +21,9 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from get_media import download, resolve  # noqa: E402
@@ -369,6 +371,93 @@ def already_done(mp4, m4a, mode="both"):
     return ok(mp4) and ok(m4a)
 
 
+DEFAULT_JOBS = 2
+MAX_JOBS = 4
+PRINT_LOCK = threading.Lock()
+
+
+def resolve_jobs(arg, env=None):
+    """--jobs / GETLEC_JOBS -> 1..MAX_JOBS，默认 DEFAULT_JOBS。"""
+    raw = arg if arg not in (None, "") else (env or os.environ).get("GETLEC_JOBS", "")
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = DEFAULT_JOBS
+    return max(1, min(MAX_JOBS, n))
+
+
+def plan_sections(groups, outdir, mode, track, force=False, dry_run=False):
+    """串行确定每节的落点、处理同一天多节改名、判断是否已下载。
+
+    命名和改名都在这里一次做完，下载阶段只管传数据 —— 这样多节并发时
+    才不会互相改文件名。
+    返回 (todo, skipped_dates)；dry_run 时 todo 只用于打印。
+    """
+    todo, skipped = [], []
+    for label, us in groups.items():
+        want = [u for u in us if track_of(u) == track.upper()]
+        pick = want[0] if want else us[0]
+        date = labels_parts(label)[0]
+
+        if dry_run:
+            mp4, m4a = target_paths(outdir, label)
+            print(f"\n=== 第 {len(todo) + 1}/{len(groups)} 节: {label}"
+                  f"  轨: {[track_of(u) for u in us]} ===")
+            print(f"  将写入: {mp4}")
+            if mode != "video":
+                print(f"          {m4a}")
+            todo.append({"label": label, "date": date, "pick": pick, "urls": us,
+                         "mp4": mp4, "m4a": m4a})
+            continue
+
+        outdir.mkdir(parents=True, exist_ok=True)
+        guard_previous(outdir / date, label, course_name(outdir), date)
+        mp4, m4a = target_paths(outdir, label)
+        if not force and already_done(mp4, m4a, mode):
+            skipped.append(date)
+            continue
+        todo.append({"label": label, "date": date, "pick": pick, "urls": us,
+                     "mp4": mp4, "m4a": m4a})
+    return todo, skipped
+
+
+def notify_done():
+    """跑完提示：终端响铃 + Windows 提示音 / macOS beep。"""
+    try:
+        print("\a", end="", flush=True)
+    except Exception:
+        pass
+    if os.name == "nt":
+        try:
+            import winsound
+            winsound.MessageBeep()
+        except Exception:
+            pass
+    elif sys.platform == "darwin":
+        try:
+            subprocess.run(["osascript", "-e", "beep"], capture_output=True, timeout=5)
+        except Exception:
+            pass
+
+
+def write_failed_log(jobs, outdir):
+    """把本次失败的节写进 logs\\，方便回看。返回路径或 None。"""
+    if not jobs:
+        return None
+    try:
+        d = ROOT / "logs"
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / f"failed_{outdir.name}_{time.strftime('%Y%m%d_%H%M%S')}.txt"
+        lines = ["# 下载失败的节（重跑同一份清单会自动跳过已完成的）"]
+        for j in jobs:
+            lines.append(f"# {j['label']}")
+            lines.append(j["pick"])
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return path
+    except Exception:
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--urls", required=True, help="每行一个媒体地址的 txt")
@@ -387,6 +476,8 @@ def main():
                     help="跳过指定的日期/标签，写法同 --only")
     ap.add_argument("--log", default="", metavar="DIR",
                     help="把输出同时写进 DIR 下的日志文件（也可设 GETLEC_LOG=1 用默认 logs/）")
+    ap.add_argument("--jobs", default="", metavar="N",
+                    help=f"并发下载的节数，1-{MAX_JOBS}（默认 {DEFAULT_JOBS}；也可设 GETLEC_JOBS）")
     a = ap.parse_args()
 
     # 缺 ffmpeg 时直接给一句人话，而不是等抽音轨阶段抛 FileNotFoundError
@@ -459,107 +550,119 @@ def main():
     mode_cn = {"both": "视频 + 音轨", "audio": "只要音轨", "video": "只要视频"}[mode]
     print(f"[mode] {mode_cn}")
 
-    done_dates = []
-    counters = {"new": 0, "skip": 0, "failed": 0}
+    jobs = resolve_jobs(a.jobs)
+    print(f"[jobs] 并发 {jobs} 路")
 
-    def process(label, us, idx, total, retry=False):
-        """处理一节；返回 new / skip / failed / dry。"""
-        tag = "重试 " if retry else ""
-        print(f"\n=== {tag}第 {idx}/{total} 节: {label}  轨: {[track_of(u) for u in us]} ===")
-        want = [u for u in us if track_of(u) == a.track.upper()]
-        pick = want[0] if want else us[0]
-        if not want and len(us) > 1:
-            print(f"  没有 {a.track} 轨，改用 {track_of(pick)}")
+    todo, skipped_dates = plan_sections(groups, outdir, mode, a.track,
+                                        force=a.force, dry_run=a.dry_run)
+    if a.dry_run:
+        return 0
 
-        date = labels_parts(label)[0]
-        if a.dry_run:
-            mp4, m4a = target_paths(outdir, label)
-            print(f"  将写入: {mp4}")
-            if mode != "video":
-                print(f"          {m4a}")
-            return "dry"
+    done_dates = list(skipped_dates)
+    n_skip = len(skipped_dates)
+    if n_skip:
+        print(f"[skip] 已下载 {n_skip} 节，本次实际需下载 {len(todo)} 节")
 
-        outdir.mkdir(parents=True, exist_ok=True)
-        guard_previous(outdir / date, label, course_name(outdir), date)
-        mp4, m4a = target_paths(outdir, label)
+    counters = {"new": 0}
+    failed_jobs = []
+    t_start = time.time()
 
-        # 增量下载的核心：本地已有完整产物就整节跳过，不联网、不重抽音轨
-        if not a.force and already_done(mp4, m4a, mode):
-            print(f"  跳过（已下载）{mp4.name if mode != 'audio' else m4a.name}")
-            counters["skip"] += 1
-            done_dates.append(date)
-            return "skip"
-
-        print(f"  [下载] -> {mp4}")
+    def process_job(job, idx, total, retry=False):
+        """下载并处理一节；返回 True 表示成功。"""
+        prefix = "重试 " if retry else ""
+        with PRINT_LOCK:
+            print(f"\n=== {prefix}第 {idx}/{total} 节: {job['label']}"
+                  f"  轨: {[track_of(u) for u in job['urls']]} ===")
+            print(f"  [下载] -> {job['mp4'].name}")
         try:
-            download(pick, mp4)
+            download(job["pick"], job["mp4"], quiet=jobs > 1)
         except Exception as e:
-            print(f"  下载失败: {e}")
-            counters["failed"] += 1
-            return "failed"
+            with PRINT_LOCK:
+                print(f"  下载失败: {e}")
+            return False
 
         if mode == "video":
-            counters["new"] += 1
-            print(f"      视频 {mp4.name}  {mp4.stat().st_size/1e6:.1f} MB")
+            with PRINT_LOCK:
+                print(f"      视频 {job['mp4'].name}  {job['mp4'].stat().st_size/1e6:.1f} MB")
+                print("  [信息]")
+                print("      " + info_of(job["mp4"]).replace("\n", "\n      "))
+                print(f"\n  视频用这个: {job['mp4']}")
+            return True
+
+        with PRINT_LOCK:
+            print(f"  [抽音频] -> {job['m4a'].name}")
+        if not extract_audio(job["mp4"], job["m4a"]):
+            return False
+        with PRINT_LOCK:
+            print(f"      {job['m4a'].name}  {job['m4a'].stat().st_size/1e6:.1f} MB")
+            if a.drop_video:
+                freed = job["mp4"].stat().st_size
+                job["mp4"].unlink()
+                print(f"      已删除录像 {job['mp4'].name}，省回 {freed/1e6:.1f} MB")
             print("  [信息]")
-            print("      " + info_of(mp4).replace("\n", "\n      "))
-            print(f"\n  视频用这个: {mp4}")
-            done_dates.append(date)
-            return "new"
+            print("      " + info_of(job["m4a"]).replace("\n", "\n      "))
+            print(f"\n  上传用这个: {job['m4a']}")
+        return True
 
-        print(f"  [抽音频] -> {m4a.name}")
-        if not extract_audio(mp4, m4a):
-            counters["failed"] += 1
-            return "failed"
-        print(f"      {m4a.name}  {m4a.stat().st_size/1e6:.1f} MB")
-        counters["new"] += 1
-        if a.drop_video:
-            freed = mp4.stat().st_size
-            mp4.unlink()
-            print(f"      已删除录像 {mp4.name}，省回 {freed/1e6:.1f} MB")
+    def record(job, ok):
+        """收尾统计 + 进度（加锁，线程安全）。"""
+        with PRINT_LOCK:
+            if ok:
+                counters["new"] += 1
+                done_dates.append(job["date"])
+            else:
+                failed_jobs.append(job)
+            done = counters["new"] + len(failed_jobs)
+            if done < len(todo):
+                elapsed = time.time() - t_start
+                eta = elapsed / done * (len(todo) - done)
+                print(f"[进度] {done}/{len(todo)} 节  已用 {fmt_dur(elapsed)}"
+                      f"  预计剩余 {fmt_dur(eta)}")
 
-        print("  [信息]")
-        print("      " + info_of(m4a).replace("\n", "\n      "))
-        print(f"\n  上传用这个: {m4a}")
-        done_dates.append(date)
-        return "new"
+    def run_one(idx, job):
+        record(job, process_job(job, idx, len(todo)))
 
-    # 第一轮（带整体进度与预计剩余时间）
-    items = list(groups.items())
-    retry_queue = []
-    t_start = time.time()
-    for idx, (label, us) in enumerate(items, 1):
-        if process(label, us, idx, len(items)) == "failed":
-            retry_queue.append((label, us))
-        if not a.dry_run and idx < len(items):
-            elapsed = time.time() - t_start
-            eta = elapsed / idx * (len(items) - idx)
-            print(f"[进度] {idx}/{len(items)} 节  已用 {fmt_dur(elapsed)}"
-                  f"  预计剩余 {fmt_dur(eta)}")
+    if jobs == 1:
+        for idx, job in enumerate(todo, 1):
+            run_one(idx, job)
+    else:
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            list(pool.map(lambda p: run_one(p[0], p[1]), enumerate(todo, 1)))
 
     # 失败节自动重试一轮（网络抖动很常见，一次就放弃太亏）
     retried = 0
-    if retry_queue and not a.dry_run:
-        retried = len(retry_queue)
+    if failed_jobs:
+        retried = len(failed_jobs)
         print(f"\n[retry] 有 {retried} 节失败，自动重试一轮 ...")
-        again = list(retry_queue)
-        retry_queue = []
-        for idx, (label, us) in enumerate(again, 1):
-            if process(label, us, idx, len(again), retry=True) == "failed":
-                retry_queue.append((label, us))
+        again = list(failed_jobs)
+        failed_jobs.clear()
+        for idx, job in enumerate(again, 1):
+            ok = process_job(job, idx, len(again), retry=True)
+            if ok:
+                with PRINT_LOCK:
+                    counters["new"] += 1
+                    done_dates.append(job["date"])
+            else:
+                with PRINT_LOCK:
+                    failed_jobs.append(job)
 
-    failed = len(retry_queue)
-    if not a.dry_run:
-        print(f"\n[小结] 新下载 {counters['new']} 节 / 跳过 {counters['skip']} 节 /"
-              f" 失败 {failed} 节  用时 {fmt_dur(time.time() - t_start)}")
-        if retried:
-            print(f"[retry] {retried} 节重试，其中 {retried - failed} 节成功")
-
-    if a.dry_run or failed or not done_dates:
-        return 1 if failed else 0
+    failed = len(failed_jobs)
+    print(f"\n[小结] 新下载 {counters['new']} 节 / 跳过 {n_skip} 节 /"
+          f" 失败 {failed} 节  用时 {fmt_dur(time.time() - t_start)}")
+    if retried:
+        print(f"[retry] {retried} 节重试，其中 {retried - failed} 节成功")
+    if failed:
+        fp = write_failed_log(failed_jobs, outdir)
+        if fp:
+            print(f"[failed] 失败清单已写入 {fp}")
+    elif counters["new"]:
+        notify_done()
 
     if log_fh:
         log_fh.flush()
+
+    if failed or not done_dates:
+        return 1 if failed else 0
 
     if a.keep_list:
         # 增量清单模式：清单原地保留，方便下周把新地址追加进来

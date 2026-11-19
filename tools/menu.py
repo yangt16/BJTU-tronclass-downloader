@@ -1,8 +1,9 @@
 """menu.py - 交互菜单（由 1-开始下载.cmd / .command 调用）。
 
-两项选择组合：
+三项选择组合：
     产物：视频+音频 / 只要音频 / 只要视频
     范围：全部 / 只下某一天 / 只下星期几 / 排除星期几
+    并发：1 / 2 / 3 / 4 路
 
 问完把选择写进 GETLEC_* 环境变量，再启动 tools/getlec.cmd（Windows）
 或 tools/getlec.sh（macOS / Linux），所以下载逻辑只有引擎一份。
@@ -18,10 +19,12 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WEEK_CN = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日"}
 MODE_CN = {"1": "视频 + 音频", "2": "只要音频", "3": "只要视频"}
+JOBS_CN = {"1": "1 路", "2": "2 路", "3": "3 路", "4": "4 路"}
 SCOPE_CN = {"1": "下载全部", "2": "只下某一天", "3": "只下星期几", "4": "排除星期几"}
 
 # 菜单接管的变量：每次运行前清掉，避免上一次的残留影响本次
-MANAGED = ("GETLEC_DROPVIDEO", "GETLEC_NOAUDIO", "GETLEC_ONLY", "GETLEC_EXCLUDE")
+MANAGED = ("GETLEC_DROPVIDEO", "GETLEC_NOAUDIO", "GETLEC_ONLY",
+           "GETLEC_EXCLUDE", "GETLEC_JOBS")
 
 
 def parse_dates(text):
@@ -36,11 +39,12 @@ def parse_weekdays(text):
     return s if re.fullmatch(r"[1-7](,[1-7])*", s) else None
 
 
-def build_env(mode, scope, value="", base=None):
-    """菜单选择 -> 环境变量。mode 取 1/2/3；scope 取 1/2/3/4。"""
+def build_env(mode, scope, value="", jobs="2", base=None):
+    """菜单选择 -> 环境变量。mode 1/2/3；scope 1/2/3/4；jobs 1..4。"""
     env = dict(os.environ if base is None else base)
     for k in MANAGED:
         env.pop(k, None)
+    env["GETLEC_JOBS"] = jobs
     if mode == "2":
         env["GETLEC_DROPVIDEO"] = "1"
     elif mode == "3":
@@ -97,6 +101,13 @@ def main():
     print("  4) 排除星期几")
     scope = choose("> ", "1", SCOPE_CN)
 
+    print("\n并发下载（越多越快，但对服务器压力也越大）：")
+    print("  1) 1 路（最稳）")
+    print("  2) 2 路  [2]")
+    print("  3) 3 路")
+    print("  4) 4 路")
+    jobs = choose("> ", "2", JOBS_CN)
+
     value = ""
     if scope == "2":
         while not value:
@@ -113,12 +124,13 @@ def main():
     print("\n" + "=" * 60)
     print(f"  产物：{mode_cn}")
     print(f"  范围：{range_cn}")
+    print(f"  并发：{JOBS_CN[jobs]}")
     print("=" * 60)
     print()
 
     sys.stdout.flush()          # 先把自己的输出吐完，再接引擎的
 
-    env = build_env(mode, scope, value)
+    env = build_env(mode, scope, value, jobs)
     if os.name == "nt":
         cmd = [os.environ.get("COMSPEC", "cmd.exe"), "/c",
                str(ROOT / "tools" / "getlec.cmd")]

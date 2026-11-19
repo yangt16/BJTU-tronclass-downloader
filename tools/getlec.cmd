@@ -13,6 +13,7 @@ REM     tools\getlec.cmd --all         same as above
 REM     tools\getlec.cmd --menu        interactive menu (1-start entry uses this)
 REM     tools\getlec.cmd lists\MYCOURSE.txt   only that list
 REM     tools\getlec.cmd lists\X.txt INSTRUCTOR   another track
+REM  env: GETLEC_JOBS=2 sets concurrent sections (1-4, default 2)
 REM
 REM  HARD RULES FOR THIS FILE:
 REM    1. ASCII ONLY. Not even Chinese in comments -- cmd.exe
@@ -61,6 +62,8 @@ set "ONLYARG="
 if not "%GETLEC_ONLY%"=="" set "ONLYARG=--only %GETLEC_ONLY%"
 set "EXCLARG="
 if not "%GETLEC_EXCLUDE%"=="" set "EXCLARG=--exclude %GETLEC_EXCLUDE%"
+set "JOBSARG="
+if not "%GETLEC_JOBS%"=="" set "JOBSARG=--jobs %GETLEC_JOBS%"
 
 if not "%TRACK%"=="" goto hafetrack
 set "TRACK=ENCODER"
@@ -98,7 +101,7 @@ echo ============================================================
 echo [getlec] LIST %LIST%
 echo [getlec] track=%TRACK%
 echo ============================================================
-"%PY%" "%ROOT%\tools\lectures.py" --urls "%LIST%" --track "%TRACK%" %DRYARG% %DROPARG% %NOAUDIOARG% %KEEPARG% %FORCEARG% %ONLYARG% %EXCLARG%
+"%PY%" "%ROOT%\tools\lectures.py" --urls "%LIST%" --track "%TRACK%" %DRYARG% %DROPARG% %NOAUDIOARG% %KEEPARG% %FORCEARG% %ONLYARG% %EXCLARG% %JOBSARG%
 if errorlevel 1 goto p_failed
 echo [getlec] OK
 echo.

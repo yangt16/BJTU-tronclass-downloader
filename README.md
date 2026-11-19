@@ -91,6 +91,7 @@ Windows 双击 `1-开始下载.cmd`，macOS / Linux 双击 `1-开始下载.comma
 ```text
 产物：1) 视频 + 音频 [默认]   2) 只要音频   3) 只要视频
 范围：1) 下载全部 [默认]      2) 只下某一天  3) 只下星期几  4) 排除星期几
+并发：1 路 / 2 路 [默认] / 3 路 / 4 路
 ```
 
 | 选择 | 产物 | 单节占用 |
@@ -166,7 +167,7 @@ D:\course-notes\
 ├─ LICENSE                    MIT 许可证
 ├─ CHANGELOG.md               版本更新日志
 ├─ bin\                       ffmpeg / ffprobe
-├─ tools\                     25 个脚本（下载、编排、抓取、测试）
+├─ tools\                     26 个脚本（下载、编排、抓取、测试）
 │  ├─ getlec.cmd / getlec.sh  主脚本（各入口都调用它）
 │  └─ ...                     其余工具与测试
 ├─ dist\                      抓取书签（install.html / bookmarks.html）

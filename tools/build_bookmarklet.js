@@ -76,7 +76,7 @@ const html = `<!doctype html>
   2. 点一下书签栏里的「抓取课程清单」<br>
   3. 按弹框提示填课程名、选是否导出三条轨（选取消 = 只导 ENCODER）<br>
   4. 浏览器会下载 <code>&lt;课程名&gt;.txt</code><br>
-  5. 双击课程下载器的 <code>1-开始下载.cmd</code>，按菜单选产物和范围
+  5. 双击课程下载器的 <code>1-开始下载.cmd</code>，按菜单选产物、范围、并发和单节加速
 </div>
 
 <div class="note warn">

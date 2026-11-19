@@ -15,6 +15,7 @@ lectures.py - 主编排：清单 → 下载 → 抽音轨 → 命名 → 归档 
 import argparse
 import pathlib
 import re
+import datetime
 import os
 import re
 import shutil
@@ -151,6 +152,24 @@ def group_by_label(urls):
     return groups
 
 
+WEEKDAY_CN = {"1": "周一", "2": "周二", "3": "周三", "4": "周四",
+              "5": "周五", "6": "周六", "7": "周日"}
+
+
+def weekday_of(date):
+    """'20261030' -> 5（1=周一 … 7=周日）；日期非法返回 0。"""
+    try:
+        d = datetime.date(int(date[0:4]), int(date[4:6]), int(date[6:8]))
+    except Exception:
+        return 0
+    return d.isoweekday()
+
+
+def spec_label(spec):
+    """把 1-7 显示成"周四"，其余原样。"""
+    return WEEKDAY_CN.get(spec, spec)
+
+
 def parse_specs(values):
     """把 --only / --exclude 的值拆成列表。
 
@@ -171,11 +190,17 @@ def match_label(label, specs):
 
     spec 可以是：
       * 日期       20261030         -> 命中这一天的所有节
+      * 星期几     4                -> 命中所有周四的节（1=周一 … 7=周日）
       * 完整标签   20261030_101000-120500
       * 前缀       20261030_10      -> 命中当天 10 点档
     """
     date = label.split("_")[0]
+    wd = weekday_of(date)
     for s in specs:
+        if len(s) == 1 and s in WEEKDAY_CN:
+            if wd == int(s):
+                return True
+            continue
         if label.startswith(s) or date == s:
             return True
     return False
@@ -192,9 +217,9 @@ def filter_groups(groups, only, exclude):
     if only or exclude:
         bits = []
         if only:
-            bits.append("只要 " + ",".join(only))
+            bits.append("只要 " + ",".join(spec_label(s) for s in only))
         if exclude:
-            bits.append("排除 " + ",".join(exclude))
+            bits.append("排除 " + ",".join(spec_label(s) for s in exclude))
         note = f"{'；'.join(bits)}：{before} 节 -> {len(groups)} 节"
     return groups, note
 
@@ -355,9 +380,10 @@ def main():
     ap.add_argument("--force", action="store_true", help="已下载的也重做")
     ap.add_argument("--keep-list", action="store_true",
                     help="跑完不动清单（不归档、不重建），适合长期维护的增量清单")
-    ap.add_argument("--only", action="append", default=[], metavar="日期",
-                    help="只下指定的日期/标签，可重复或用逗号分隔，如 20261030 或 20261030_10")
-    ap.add_argument("--exclude", action="append", default=[], metavar="日期",
+    ap.add_argument("--only", action="append", default=[], metavar="日期/1-7",
+                    help="只下指定日期、星期几(1=周一..7=周日)或标签，可重复或用逗号分隔，"
+                         "如 20261030 或 4")
+    ap.add_argument("--exclude", action="append", default=[], metavar="日期/1-7",
                     help="跳过指定的日期/标签，写法同 --only")
     ap.add_argument("--log", default="", metavar="DIR",
                     help="把输出同时写进 DIR 下的日志文件（也可设 GETLEC_LOG=1 用默认 logs/）")
@@ -421,7 +447,7 @@ def main():
         groups, note = filter_groups(groups, only_specs, excl_specs)
         print(f"[filter] {note}")
         if not groups:
-            print("[filter] 没有符合条件的节。检查日期是否写对（形如 20261030）")
+            print("[filter] 没有符合条件的节。检查日期（20261030）或星期几（1-7）是否写对")
             return 0
         # 筛选模式下绝不归档清单：否则会把没处理的那些地址一起搬走
         if not a.keep_list:

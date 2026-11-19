@@ -1,14 +1,16 @@
 @echo off
 REM ===========================================================
-REM  Download only ONE DAY (or several days) of lectures.
+REM  Download only selected day(s) or weekday(s).
 REM
-REM  Asks for a date, then runs the normal batch with a filter.
-REM  Works on every list in lists\ at once: days that a course
-REM  does not have are simply ignored.
+REM  Asks for a date or a weekday number, then runs the normal
+REM  batch with a filter. Works on every list in lists\ at once:
+REM  days a course does not have are simply ignored.
 REM
-REM  Examples of what you can type:
+REM  What you can type:
 REM     20261030              one day
 REM     20261030,20261104     several days
+REM     4                     every Thursday (1=Mon .. 7=Sun)
+REM     2,4                   Monday and Thursday
 REM     (empty)               no filter, download everything
 REM
 REM  The list is NOT archived when filtering, so it stays usable.
@@ -19,10 +21,10 @@ setlocal
 chcp 65001 >nul
 
 echo ============================================================
-echo  Download only selected day(s)
+echo  Download only selected day(s) / weekday(s)
 echo ============================================================
 set "DAY="
-set /p "DAY=Date(s) to download - YYYYMMDD, comma for several, empty=all: "
+set /p "DAY=Date 20261030 or weekday 1-7 (1=Mon..7=Sun), comma ok, empty=all: "
 
 if not defined DAY goto runall
 
@@ -36,7 +38,7 @@ goto run
 :bad
 echo.
 echo [day] ERROR: bad input: "%DAY%"
-echo       Use 8 digits, e.g. 20261030 or 20261030,20261104
+echo       Use 8-digit date (20261030) or weekday 1-7 (1=Mon..7=Sun), comma for several
 echo.
 if "%GETLEC_NOPAUSE%"=="" pause
 exit /b 1

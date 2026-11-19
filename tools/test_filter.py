@@ -12,7 +12,8 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from lectures import filter_groups, match_label, parse_specs  # noqa: E402
+from lectures import (filter_groups, match_label, parse_specs,  # noqa: E402
+                     spec_label, weekday_of)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -78,6 +79,31 @@ check("only+exclude 同时命中 -> 空", len(g), 0)
 
 g, _ = filter_groups(dict(groups), [], [])
 check("不过滤 -> 原样", len(g), 3)
+
+# ---------- 星期几 ----------
+check("weekday_of 20261030 是周五", weekday_of("20261030"), 5)
+check("weekday_of 20261104 是周三", weekday_of("20261104"), 3)
+check("weekday_of 非法日期 -> 0", weekday_of("20261340"), 0)
+check("spec_label 1-7", spec_label("5"), "周五")
+check("spec_label 日期原样", spec_label("20261030"), "20261030")
+
+check("match 周五命中", match_label(L, ["5"]), True)
+check("match 周四不命中", match_label(L, ["4"]), False)
+check("单个数字不当日期前缀", match_label(L, ["2"]), False)
+check("多星期任一命中", match_label(L, ["4", "5"]), True)
+
+g, note = filter_groups(dict(groups), ["5"], [])
+check("--only 周五", sorted(g), ["20261030_101000-120500", "20261106_162000-181500"])
+check("说明写成周五", "周五" in note, True)
+
+g, _ = filter_groups(dict(groups), [], ["5"])
+check("--exclude 周五", sorted(g), ["20261104_080000-095500"])
+
+g, _ = filter_groups(dict(groups), ["3"], [])
+check("--only 周三", sorted(g), ["20261104_080000-095500"])
+
+g, _ = filter_groups(dict(groups), ["5", "20261104"], [])
+check("日期+星期混合", len(g), 3)
 
 print()
 print("全部通过" if bad == 0 else f"{bad} 项失败")

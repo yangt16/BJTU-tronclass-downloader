@@ -75,6 +75,62 @@ START_HERE = """\
 README.md              项目简介
 docs\\使用说明.md       完整手册（含故障排查）
 """
+START_HERE_MAC = """\
+课程回放下载器 · macOS / Linux 版
+================================
+
+本包不含 ffmpeg（macOS 上用 Homebrew 装，别在包里带二进制）。
+
+第一步（一次性）
+---------------
+在“终端”里进入本文件夹，然后：
+
+    chmod +x *.command *.sh
+    brew install ffmpeg python3      # Linux: sudo apt install ffmpeg python3
+    ./setup.command
+
+  setup.command 会检查 python3 与 ffmpeg、建好 lists/ 文件夹。
+
+第二步：拿到课程地址
+-------------------
+方式 A（推荐）：装书签
+   1. 用 Chrome / Edge 打开 dist/install.html
+   2. 把页面里的蓝色按钮拖到书签栏
+   3. 打开课程的「直播」列表页，点一下书签，会下载一个 <课程名>.txt
+
+方式 B（手动）：自己复制播放地址
+   见 docs/使用说明.md 的「手动版」一节。
+
+第三步：下载
+-----------
+双击以下任一个（Finder 里就是中文名字的 .command 文件）：
+   下视频和音频.command     视频 + 音轨都留（默认）
+   只要音轨.command         只留音轨，省空间（只做转写用这个）
+   只要视频.command         只留视频
+   只下某一天.command       只下指定的某一天
+
+若双击提示“无法验证开发者”：右键文件，选“打开”，再确认一次。
+若提示权限不足：终端里执行 chmod +x *.command *.sh
+
+产物在 media/<课程名>/<日期>/ 下。
+
+详细文档
+--------
+README.md              项目简介
+docs/使用说明.md       完整手册（含故障排查）
+"""
+
+
+def zip_write(z, path, arcname, executable=False):
+    """写入 zip；脚本保留 755，其他 644（mac 上解压后可直接双击）。"""
+    zi = zipfile.ZipInfo.from_file(str(path), arcname)
+    mode = 0o755 if executable else 0o644
+    zi.external_attr = (0o100000 | mode) << 16
+    zi.compress_type = zipfile.ZIP_DEFLATED
+    with open(path, "rb") as f:
+        z.writestr(zi, f.read())
+
+
 LICENSE_FFMPEG = """\
 这个发布包内含 FFmpeg 可执行文件（ffmpeg.exe / ffprobe.exe）。
 
@@ -149,55 +205,69 @@ def ensure_assets(no_gpl):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--version", default="")
+    ap.add_argument("--platform", choices=["win", "mac"], default="win",
+                    help="win = 内置 ffmpeg 的 Windows 包；mac = 不含 ffmpeg 的 macOS/Linux 包")
     ap.add_argument("--no-gpl-text", action="store_true")
     a = ap.parse_args()
 
     ver = version_of(a.version)
-    name = f"tronclass-downloader-{ver}-win64"
+    win = (a.platform == "win")
+    suffix = "win64" if win else "mac"
+    name = f"tronclass-downloader-{ver}-{suffix}"
     out_zip = RELEASE / f"{name}.zip"
     RELEASE.mkdir(parents=True, exist_ok=True)
 
-    # 必须有 ffmpeg 才能打完整包
-    ff = [ROOT / "bin" / n for n in ("ffmpeg.exe", "ffprobe.exe")]
-    missing = [p.name for p in ff if not p.exists()]
-    if missing:
-        raise SystemExit(f"缺少 {missing}；先跑一次 setup.cmd 再打包")
-
-    sh, lf, gpl = ensure_assets(a.no_gpl_text)
+    ff = []
+    if win:
+        # Windows 包要自带 ffmpeg
+        ff = [ROOT / "bin" / n for n in ("ffmpeg.exe", "ffprobe.exe")]
+        missing = [p.name for p in ff if not p.exists()]
+        if missing:
+            raise SystemExit(f"缺少 {missing}；先跑一次 setup.cmd 再打包")
+        sh, lf, gpl = ensure_assets(a.no_gpl_text)
+        extras = [sh, lf, gpl]
+    else:
+        ASSETS.mkdir(parents=True, exist_ok=True)
+        sh = ASSETS / "START-HERE-mac.txt"
+        sh.write_text(START_HERE_MAC, encoding="utf-8")
+        extras = [sh]
 
     if out_zip.exists():
         out_zip.unlink()
 
     files = tracked_files()
-    cmd_files = [f for f in files if f.lower().endswith(".cmd")]
-    # .cmd 必须是 CRLF，否则解压出来的入口会坏
-    for f in cmd_files:
+    # .cmd 必须 CRLF / .sh 必须 LF，否则解压出来的入口会坏
+    for f in files:
         raw = (ROOT / f).read_bytes()
-        if b"\r\n" not in raw:
+        if f.lower().endswith(".cmd") and b"\r\n" not in raw:
             raise SystemExit(f"{f} 不是 CRLF，先在仓库里修好再打包")
+        if f.endswith((".sh", ".command")) and b"\r\n" in raw:
+            raise SystemExit(f"{f} 含 CRLF（mac 会报 bad interpreter）")
 
     total = 0
-    with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+    with zipfile.ZipFile(out_zip, "w") as z:
         for f in files:
             src = ROOT / f
             if not src.exists():
                 print(f"[release] 跳过不存在的跟踪文件: {f}")
                 continue
-            z.write(src, f"{name}/{f}")
+            exec_bit = f.endswith((".sh", ".command"))
+            zip_write(z, src, f"{name}/{f}", executable=exec_bit)
             total += 1
         for p in ff:
-            z.write(p, f"{name}/bin/{p.name}")
+            zip_write(z, p, f"{name}/bin/{p.name}")
             total += 1
-        for extra in (sh, lf, gpl):
+        for extra in extras:
             if extra and extra.exists():
-                z.write(extra, f"{name}/{extra.name}")
+                arc = f"{name}/START-HERE.txt" if extra.name.startswith("START-HERE") else f"{name}/{extra.name}"
+                zip_write(z, extra, arc)
                 total += 1
-        # 空中目录：解压后就有 lists\，省得用户自己建
+        # 空中目录：解压后就有 lists/，省得用户自己建
         z.writestr(f"{name}/lists/", "")
 
     size = out_zip.stat().st_size / 1e6
     print(f"\n[release] {out_zip}")
-    print(f"[release] {size:.1f} MB，{total} 个文件，版本 {ver}")
+    print(f"[release] {size:.1f} MB，{total} 个文件，版本 {ver}，平台 {a.platform}")
     if size > 1900:
         print("[release] 警告：超过 GitHub Releases 单文件 2 GB 上限")
     return 0

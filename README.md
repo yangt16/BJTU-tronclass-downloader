@@ -28,13 +28,16 @@
 
 ## 部署（拿到程序）
 
-### 方式 1：Release 包（推荐给不用命令行的同学）
+### 方式 1：Release 包（不用命令行的同学）
 
-打开 [Releases](https://github.com/yangt16/tronclass-downloader/releases/latest)，
-下载 `tronclass-downloader-v3-win64.zip`（约 220 MB，**已内置 ffmpeg**）→ 解压 →
-双击 `setup.cmd`（会秒过，因为 ffmpeg 已就位）。
+打开 [Releases](https://github.com/yangt16/tronclass-downloader/releases/latest)，按平台下载：
 
-### 方式 2：有 Git，一行命令
+| 平台 | 文件 | 大小 | 拿到后 |
+|---|---|---|---|
+| Windows | `tronclass-downloader-v3.1-win64.zip` | 74 MB | 解压 → 双击 `setup.cmd`（ffmpeg 已内置，秒过） |
+| macOS / Linux | `tronclass-downloader-v3.1-mac.zip` | 70 KB | 先 `brew install ffmpeg python3`，再 `chmod +x *.command *.sh && ./setup.command` |
+
+### 方式 2：有 Git，一行命令（Windows）
 
 ```bat
 git clone --depth 1 https://github.com/yangt16/tronclass-downloader.git && cd tronclass-downloader && setup.cmd
@@ -42,24 +45,23 @@ git clone --depth 1 https://github.com/yangt16/tronclass-downloader.git && cd tr
 
 ### 方式 3：没有 Git（Windows）
 
-浏览器打开仓库页 → `Code` → `Download ZIP` → 解压 → 双击 `setup.cmd`
+仓库页 → `Code` → `Download ZIP` → 解压 → 双击 `setup.cmd`
 （这个包不含 ffmpeg，setup 会下载约 200 MB）。
 
-### 方式 4：macOS / Linux
+### 方式 4：macOS / Linux（用 Git）
 
 ```sh
 git clone --depth 1 https://github.com/yangt16/tronclass-downloader.git
 cd tronclass-downloader
-brew install ffmpeg python        # Linux: apt install ffmpeg python3
+brew install ffmpeg python3       # Linux: sudo apt install ffmpeg python3
 chmod +x *.command *.sh           # 从 ZIP 解压时需要
 ./setup.command
 ```
 
-之后双击 `.command` 文件即可（Finder 里就是四个中文名字的入口）。
-**注意**：Release 里的 win64 压缩包只适用于 Windows。
+之后在 Finder 里双击 `.command` 文件即可。
 
-**前置条件**：Windows / macOS / Linux + Python 3.8+；
-Windows 的 ffmpeg 由 `setup.cmd` 自动下载，macOS/Linux 用包管理器装。
+**前置条件**：Python 3.8+。
+Windows 的 ffmpeg 由 `setup.cmd` 自动下载；macOS / Linux 用包管理器装。
 
 ---
 
@@ -77,9 +79,9 @@ D:\course-notes\lists\XX课程.txt
 [手动版](docs/使用说明.md#手动版自己粘地址) 或
 [自动版（书签）](docs/使用说明.md#自动版书签一次抓一门课)。
 
-### 2. 双击三个入口之一
+### 2. 双击入口之一
 
-Windows 用 `.cmd`，macOS 用同名的 `.command`：
+Windows 用 `.cmd`，macOS / Linux 用同名的 `.command`：
 
 | 入口（Windows / macOS） | 产物 | 单节占用 |
 |---|---|---|
@@ -87,10 +89,9 @@ Windows 用 `.cmd`，macOS 用同名的 `.command`：
 | **只要音轨.cmd / .command** | 只留 m4a | ~110 MB |
 | **只要视频.cmd / .command** | 只留 mp4 | ~640 MB |
 | **只下某一天.cmd / .command** | 问你要哪一天，只下那天（产物按上面选） | — |
-| **只下某一天.cmd** | 问你要哪一天，只下那天（产物按上面选） | — |
 
 前三个都支持"双击跑全部清单"和"拖一个 txt 进去只跑它"。
-第四个会先问日期（`20261030`，或 `20261030,20261104`），直接回车 = 不过滤。
+最后一个会先问日期（`20261030`，或 `20261030,20261104`），直接回车 = 不过滤。
 
 ### 3. 产物
 
@@ -121,11 +122,12 @@ media\XX课程\20260921\
 
 | 依赖 | 状态 |
 |---|---|
-| Python 3.8+ | 需要（自动探测：`python\python.exe` → PATH 的 `python` → `py -3`） |
+| Python 3.8+ | 需要。探测顺序：`python\python.exe` → PATH 的 `python` → `py -3`（macOS/Linux 先找 `python3`） |
 | ffmpeg | Windows：双击 `setup.cmd` 自动下载（约 200 MB，装进 `bin\`）；macOS/Linux：`brew install ffmpeg` / `apt install ffmpeg` |
 | 网络 | 能直连校内 TronClass，不需要 VPN |
 
-> 第一次用（或换了新机器）：双击 **`setup.cmd`** —— 它会找 Python、下载 ffmpeg、建好 `lists\`。
+> 第一次用（或换了新机器）：双击 **`setup.cmd`**（macOS：`./setup.command`）——
+> 它会找 Python、确认 ffmpeg、建好 `lists\`。
 
 程序用自身所在目录做根目录，整个文件夹可搬到任意位置。
 
@@ -153,6 +155,7 @@ D:\course-notes\
 ├─ lists\                 ★ 在这里建 <科目>.txt
 ├─ media\                 ★ 下载产物
 ├─ har_archive\           历史清单归档
+├─ release\              发布包产物（构建生成，不入库）
 └─ tmp\                   临时目录
 ```
 
@@ -176,7 +179,7 @@ D:\course-notes\
 
 | 文档 | 内容 |
 |---|---|
-| [`docs/使用说明.md`](docs/使用说明.md) | 完整手册：手动/自动取地址、三种模式、输出规则、增量、命令速查、故障排查、测试、设计说明 |
+| [`docs/使用说明.md`](docs/使用说明.md) | 完整手册（含 macOS 用法）：手动/自动取地址、三种模式、输出规则、增量、命令速查、故障排查、测试、设计说明 |
 | `tools/*.py` 文件头 | 各脚本职责与参数 |
 
 ---

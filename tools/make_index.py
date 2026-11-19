@@ -51,7 +51,7 @@ def build(outdir):
 
 
 def rebuild(outdir):
-    """重建索引，返回写出的路径（失败返回 None）。供 lec_from_har 下载完自动调用。"""
+    """重建索引，返回写出的路径（失败返回 None）。供 lectures.py 归档后自动调用。"""
     try:
         course = course_name(outdir)
         rows = build(outdir)

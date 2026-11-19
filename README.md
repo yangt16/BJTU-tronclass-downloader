@@ -30,17 +30,17 @@
 
 ### 方式 1：Release 包（不用命令行的同学）
 
-打开 [Releases](https://github.com/yangt16/tronclass-downloader/releases/latest)，按平台下载：
+打开 [Releases](https://github.com/yangt16/BJTU-tronclass-downloader/releases/latest)，按平台下载：
 
 | 平台 | 文件 | 大小 | 拿到后 |
 |---|---|---|---|
-| Windows | `tronclass-downloader-v3.1-win64.zip` | 74 MB | 解压 → 双击 `setup.cmd`（ffmpeg 已内置，秒过） |
-| macOS / Linux | `tronclass-downloader-v3.1-mac.zip` | 70 KB | 先 `brew install ffmpeg python3`，再 `chmod +x *.command *.sh && ./setup.command` |
+| Windows | `tronclass-downloader-v3.2-win64.zip` | 77.7 MB | 解压 → 双击 `setup.cmd`（ffmpeg 已内置，秒过） |
+| macOS / Linux | `tronclass-downloader-v3.2-mac.zip` | 0.08 MB | 先 `brew install ffmpeg python3`，再 `chmod +x *.command *.sh && ./setup.command` |
 
 ### 方式 2：有 Git，一行命令（Windows）
 
 ```bat
-git clone --depth 1 https://github.com/yangt16/tronclass-downloader.git && cd tronclass-downloader && setup.cmd
+git clone --depth 1 https://github.com/yangt16/BJTU-tronclass-downloader.git && cd BJTU-tronclass-downloader && setup.cmd
 ```
 
 ### 方式 3：没有 Git（Windows）
@@ -51,8 +51,8 @@ git clone --depth 1 https://github.com/yangt16/tronclass-downloader.git && cd tr
 ### 方式 4：macOS / Linux（用 Git）
 
 ```sh
-git clone --depth 1 https://github.com/yangt16/tronclass-downloader.git
-cd tronclass-downloader
+git clone --depth 1 https://github.com/yangt16/BJTU-tronclass-downloader.git
+cd BJTU-tronclass-downloader
 brew install ffmpeg python3       # Linux: sudo apt install ffmpeg python3
 chmod +x *.command *.sh           # 从 ZIP 解压时需要
 ./setup.command

@@ -38,20 +38,23 @@ jobs:
         run: node tools/test_scrape.js dist/bookmarklet.txt
 
       - name: 入口脚本冒烟（dry-run，不下载）
-        shell: cmd
+        # 用 pwsh 而不是 cmd：runner 的 cmd 默认非 UTF-8，
+        # 脚本里写中文文件名（1-下视频和音频.cmd）会乱码导致找不到文件。
+        shell: pwsh
         run: |
-          if not exist lists mkdir lists
-          if not exist tmp mkdir tmp
-          echo %CI_FAKE_URL%> lists\ci.txt
-          set GETLEC_DRYRUN=1
-          set GETLEC_NOPAUSE=1
-          call 1-下视频和音频.cmd lists\ci.txt > ci_out.txt 2>&1
-          type ci_out.txt
-          findstr /c:"[mode]" ci_out.txt || exit /b 1
-          findstr /c:"[dest]" ci_out.txt || exit /b 1
-          echo 20261111| call 4-只下某一天.cmd lists\ci.txt > ci_day.txt 2>&1
-          type ci_day.txt
-          findstr /c:"[filter]" ci_day.txt || exit /b 1
+          New-Item -ItemType Directory -Force -Path lists | Out-Null
+          Set-Content -Path 'lists\ci.txt' -Value $env:CI_FAKE_URL -Encoding utf8
+          $env:GETLEC_DRYRUN = '1'
+          $env:GETLEC_NOPAUSE = '1'
+
+          $out = & '.\1-下视频和音频.cmd' 'lists\ci.txt' 2>&1 | Out-String
+          Write-Host $out
+          if ($out -notmatch '\[mode\]') { throw 'entry: no [mode] line' }
+          if ($out -notmatch '\[dest\]') { throw 'entry: no [dest] line' }
+
+          $out2 = '20261111' | & '.\4-只下某一天.cmd' 'lists\ci.txt' 2>&1 | Out-String
+          Write-Host $out2
+          if ($out2 -notmatch '\[filter\]') { throw 'day entry: no [filter] line' }
 
   # ---------------- macOS ----------------
   test-macos:

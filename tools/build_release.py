@@ -83,7 +83,10 @@ START_HERE_MAC = """\
 
 第一步（一次性）
 ---------------
-在“终端”里进入本文件夹，然后：
+在“终端”里进入本文件夹，然后**逐条输入命令**：
+
+  注意：不要把脚本内容复制粘贴到终端！zsh 会把 #!/bin/sh 里的 ! 当成
+  历史展开，报错 "zsh: event not found: /bin/sh"。请执行文件，不要粘贴内容。
 
     chmod +x *.command *.sh
     brew install ffmpeg python3      # Linux: sudo apt install ffmpeg python3

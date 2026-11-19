@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------- Windows ----------------
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python 测试（7 套）
+        shell: bash
+        run: |
+          set -e
+          for t in test_naming test_modes test_filter test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+            echo "::group::$t"
+            python "tools/$t.py"
+            echo "::endgroup::"
+          done
+
+      - name: 书签脚本逻辑测试（需 Node）
+        run: node tools/test_scrape.js dist/bookmarklet.txt
+
+  # ---------------- macOS ----------------
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: ffmpeg（macOS runner 不保证预装时补上）
+        run: |
+          command -v ffmpeg && ffmpeg -version | head -1 || brew install ffmpeg
+
+      - name: shell 语法检查
+        run: |
+          set -e
+          for f in *.sh *.command; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
+
+      - name: 实际运行 setup.command 与 getlec.sh
+        env:
+          GETLEC_NOPAUSE: "1"
+        run: |
+          set -e
+          printf '\n' | sh ./setup.command
+          sh ./getlec.sh
+
+      - name: Python 测试 + shell 入口检查（含可执行位）
+        run: |
+          set -e
+          for t in test_naming test_modes test_filter test_cmd_ascii test_docs test_fetch_ffmpeg test_shell; do
+            echo "::group::$t"
+            python "tools/$t.py"
+            echo "::endgroup::"
+          done
+
+  # ---------------- 打包冒烟（Linux runner，不需要 ffmpeg） ----------------
+  package-mac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 打 macOS 发布包并检查内容
+        run: |
+          set -e
+          python tools/build_release.py --version ci --platform mac
+          python - <<'PY'
+          import glob
+          import zipfile
+
+          path = glob.glob("release/*-ci-mac.zip")[0]
+          z = zipfile.ZipFile(path)
+          names = z.namelist()
+
+          assert any(n.endswith("getlec.sh") for n in names), "缺 getlec.sh"
+          assert any(n.endswith("setup.command") for n in names), "缺 setup.command"
+          assert any(n.endswith("dist/bookmarks.html") for n in names), "缺 bookmarks.html"
+          assert any(n.endswith("/lists/") for n in names), "缺 lists/ 空目录"
+
+          modes = {
+              i.filename.split("/")[-1]: oct((i.external_attr >> 16) & 0o777)
+              for i in z.infolist()
+              if i.filename.endswith((".sh", ".command"))
+          }
+          assert modes, "包里没有 shell 脚本"
+          bad = {k: v for k, v in modes.items() if v != "0o755"}
+          assert not bad, f"可执行位不对: {bad}"
+
+          print(f"ok: {len(names)} 个条目，{len(modes)} 个脚本均为 0o755")
+          PY

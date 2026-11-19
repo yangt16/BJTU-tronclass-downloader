@@ -9,3 +9,4 @@
 # shell 脚本必须 LF（CRLF 会让 macOS 报 bad interpreter）
 *.sh text eol=lf
 *.command text eol=lf
+*.yml text eol=lf

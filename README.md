@@ -152,6 +152,8 @@ D:\course-notes\
 ├─ 只下某一天.command
 ├─ getlec.cmd / getlec.sh  主脚本（各入口都调用它）
 ├─ docs\使用说明.md       完整使用手册
+├─ LICENSE                MIT 许可证
+├─ CHANGELOG.md           版本更新日志
 ├─ bin\                   ffmpeg / ffprobe
 ├─ tools\                 18 个脚本（下载、编排、抓取、测试）
 ├─ dist\                  抓取书签（install.html 拖拽安装）
@@ -183,6 +185,7 @@ D:\course-notes\
 | 文档 | 内容 |
 |---|---|
 | [`docs/使用说明.md`](docs/使用说明.md) | 完整手册（含 macOS 用法）：手动/自动取地址、三种模式、输出规则、增量、命令速查、故障排查、测试、设计说明 |
+| [`CHANGELOG.md`](CHANGELOG.md) | 各版本更新内容 |
 | `tools/*.py` 文件头 | 各脚本职责与参数 |
 
 ---
@@ -192,3 +195,10 @@ D:\course-notes\
 - 仅用于**个人学习**：下载自己有权访问的课程内容。
 - 程序不处理、不存储任何账号密码；抓取只在你自己已登录的浏览器里执行。
 - 下载的文件保存在本地 `media\`，请勿公开传播课程内容。
+
+## 许可证
+
+代码以 [MIT 许可证](LICENSE) 发布，可自由使用、修改、分发（保留版权声明）。
+
+发布包内附的 ffmpeg 是独立的第三方程序，按其自身许可证（GPLv3）分发，
+详见发布包内的 `LICENSE-ffmpeg.txt` 与 `COPYING.GPLv3.txt`。

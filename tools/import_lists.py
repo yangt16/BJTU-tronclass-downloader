@@ -13,7 +13,6 @@ import argparse
 import os
 import pathlib
 import re
-import shutil
 import sys
 
 try:

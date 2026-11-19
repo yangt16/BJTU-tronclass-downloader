@@ -18,7 +18,6 @@ build_release.py - 打一个"下载解压就能用"的 Windows 发布包。
 """
 import argparse
 import pathlib
-import shutil
 import subprocess
 import sys
 import urllib.request

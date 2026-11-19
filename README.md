@@ -158,7 +158,7 @@ D:\course-notes\
 ├─ LICENSE                MIT 许可证
 ├─ CHANGELOG.md           版本更新日志
 ├─ bin\                   ffmpeg / ffprobe
-├─ tools\                 18 个脚本（下载、编排、抓取、测试）
+├─ tools\                 19 个脚本（下载、编排、抓取、测试）
 ├─ dist\                  抓取书签（install.html 拖拽安装）
 ├─ lists\                 ★ 在这里建 <科目>.txt
 ├─ media\                 ★ 下载产物

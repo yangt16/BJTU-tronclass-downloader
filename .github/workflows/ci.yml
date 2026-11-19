@@ -44,6 +44,12 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path lists | Out-Null
           Set-Content -Path 'lists\ci.txt' -Value $env:CI_FAKE_URL -Encoding utf8
+
+          # runner 上没有 ffmpeg；dry-run 不需要真解码器，
+          # 放一个假的让它通过 lectures.py 的启动检查
+          New-Item -ItemType Directory -Force -Path tmp\fakebin | Out-Null
+          Set-Content -Path 'tmp\fakebin\ffmpeg.cmd' -Value '@exit /b 0' -Encoding ascii
+          $env:PATH = "$PWD\tmp\fakebin;$env:PATH"
           $env:GETLEC_DRYRUN = '1'
           $env:GETLEC_NOPAUSE = '1'
 
@@ -111,11 +117,17 @@ jobs:
 
   # ---------------- Linux（顺带验证 3.8 下限） ----------------
   test-linux:
-    runs-on: ubuntu-latest
+    # ubuntu-latest 是 26.04，actions/setup-python 已不再提供 3.8；
+    # 3.8 放到 ubuntu-22.04 上验证
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.11"]
+        include:
+          - os: ubuntu-22.04
+            python-version: "3.8"
+          - os: ubuntu-latest
+            python-version: "3.11"
     steps:
       - uses: actions/checkout@v4
 
@@ -131,7 +143,10 @@ jobs:
       - name: 入口脚本冒烟（dry-run）
         run: |
           set -e
-          mkdir -p lists
+          mkdir -p lists tmp/fakebin
+          printf '#!/bin/sh\nexit 0\n' > tmp/fakebin/ffmpeg
+          chmod +x tmp/fakebin/ffmpeg
+          export PATH="$PWD/tmp/fakebin:$PATH"
           printf '%s\n' "$CI_FAKE_URL" > lists/ci.txt
           export GETLEC_DRYRUN=1 GETLEC_NOPAUSE=1
           out=$(sh ./1-下视频和音频.command lists/ci.txt 2>&1)

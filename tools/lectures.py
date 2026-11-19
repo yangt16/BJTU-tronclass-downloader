@@ -402,6 +402,24 @@ def effective_segments(arg, jobs, env=None):
     return min(seg, max(1, SEG_CONN_MAX // max(1, jobs)))
 
 
+def read_batch_ctx(env=None):
+    """批次模式上下文（由 tools/batch.py 通过环境变量传入）。
+
+    返回 {"total": 总节数, "before": 本清单之前已处理节数, "start": 批次开始时间}
+    或 None（单清单模式）。
+    """
+    env = os.environ if env is None else env
+    try:
+        total = int(env.get("GETLEC_BATCH_TOTAL", ""))
+        before = int(env.get("GETLEC_BATCH_BEFORE", "0"))
+        start = float(env.get("GETLEC_BATCH_START", ""))
+    except (TypeError, ValueError):
+        return None
+    if total <= 0:
+        return None
+    return {"total": total, "before": before, "start": start}
+
+
 def plan_sections(groups, outdir, mode, track, force=False, dry_run=False):
     """串行确定每节的落点、处理同一天多节改名、判断是否已下载。
 
@@ -581,6 +599,7 @@ def main():
 
     done_dates = list(skipped_dates)
     n_skip = len(skipped_dates)
+    ctx = read_batch_ctx()
     if n_skip:
         print(f"[skip] 已下载 {n_skip} 节，本次实际需下载 {len(todo)} 节")
 
@@ -634,11 +653,21 @@ def main():
             else:
                 failed_jobs.append(job)
             done = counters["new"] + len(failed_jobs)
-            if done < len(todo):
-                elapsed = time.time() - t_start
-                eta = elapsed / done * (len(todo) - done)
-                print(f"[进度] {done}/{len(todo)} 节  已用 {fmt_dur(elapsed)}"
-                      f"  预计剩余 {fmt_dur(eta)}")
+            if done >= len(todo):
+                return
+            if ctx:
+                done_all = ctx["before"] + n_skip + done
+                if done_all >= ctx["total"]:
+                    return
+                elapsed_all = time.time() - ctx["start"]
+                eta = elapsed_all / done_all * (ctx["total"] - done_all)
+                print(f"[batch] 全局 {done_all}/{ctx['total']} 节"
+                      f"  已用 {fmt_dur(elapsed_all)}  预计剩余 {fmt_dur(eta)}")
+                return
+            elapsed = time.time() - t_start
+            eta = elapsed / done * (len(todo) - done)
+            print(f"[进度] {done}/{len(todo)} 节  已用 {fmt_dur(elapsed)}"
+                  f"  预计剩余 {fmt_dur(eta)}")
 
     def run_one(idx, job):
         record(job, process_job(job, idx, len(todo)))
@@ -676,7 +705,7 @@ def main():
         fp = write_failed_log(failed_jobs, outdir)
         if fp:
             print(f"[failed] 失败清单已写入 {fp}")
-    elif counters["new"]:
+    elif counters["new"] and not ctx:
         notify_done()
 
     if log_fh:

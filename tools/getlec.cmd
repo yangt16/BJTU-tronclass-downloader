@@ -28,6 +28,7 @@ chcp 65001 >nul
 REM this file lives in tools\ - the project root is its parent
 for %%I in ("%~dp0..") do set "ROOT=%%~fI"
 set "FIRST=%~1"
+set "RC=0"
 set "TRACK=%~2"
 
 REM ---------- find python (each candidate must actually run) ----------
@@ -87,8 +88,10 @@ echo.
 set "CNT=0"
 "%PY%" "%ROOT%\tools\lists.py"
 if errorlevel 1 goto done
-for /f "delims=" %%L in ('dir /b /o-n "%ROOT%\lists\*.txt" 2^>nul') do call :run_one "%ROOT%\lists\%%L"
-if "%CNT%"=="0" echo [getlec] nothing to do
+REM batch loop lives in tools\batch.py (single copy for cmd and sh)
+set "GETLEC_TRACK=%TRACK%"
+"%PY%" "%ROOT%\tools\batch.py"
+set "RC=%ERRORLEVEL%"
 goto done
 
 REM -----------------------------------------------------------
@@ -127,7 +130,7 @@ exit /b 1
 echo.
 "%PY%" "%ROOT%\tools\make_index.py"
 if "%GETLEC_NOPAUSE%"=="" pause
-exit /b 0
+exit /b %RC%
 
 REM -----------------------------------------------------------
 REM  subroutines at the very end: the main flow must not fall

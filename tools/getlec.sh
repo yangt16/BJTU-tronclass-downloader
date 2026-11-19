@@ -77,15 +77,10 @@ if [ -z "$FIRST" ] || [ "$FIRST" = "--all" ]; then
     echo "[getlec] BATCH mode over $ROOT/lists"
     echo
     "$PY" "$ROOT/tools/lists.py"
-    FOUND=0
-    for f in "$ROOT"/lists/*.txt; do
-        [ -e "$f" ] || continue
-        FOUND=1
-        run_one "$f"
-    done
-    if [ "$FOUND" -eq 0 ]; then
-        echo "[getlec] nothing to do"
-    fi
+    # batch loop lives in tools/batch.py (single copy for cmd and sh)
+    GETLEC_TRACK="$TRACK"; export GETLEC_TRACK
+    "$PY" "$ROOT/tools/batch.py"
+    RC=$?
 else
     run_one "$FIRST"
 fi
@@ -97,4 +92,4 @@ if [ -z "${GETLEC_NOPAUSE:-}" ]; then
     printf "\nPress Enter to close..."
     read -r _ || true
 fi
-exit 0
+exit ${RC:-0}

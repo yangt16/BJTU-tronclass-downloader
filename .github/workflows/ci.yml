@@ -50,18 +50,18 @@ jobs:
       - name: shell 语法检查
         run: |
           set -e
-          for f in *.sh *.command; do
+          for f in tools/*.sh *.command; do
             echo "bash -n $f"
             bash -n "$f"
           done
 
-      - name: 实际运行 setup.command 与 getlec.sh
+      - name: 实际运行 0-首次安装.command 与 tools/getlec.sh
         env:
           GETLEC_NOPAUSE: "1"
         run: |
           set -e
-          printf '\n' | sh ./setup.command
-          sh ./getlec.sh
+          printf '\n' | sh ./0-首次安装.command
+          sh ./tools/getlec.sh
 
       - name: Python 测试 + shell 入口检查（含可执行位）
         run: |
@@ -94,8 +94,8 @@ jobs:
           z = zipfile.ZipFile(path)
           names = z.namelist()
 
-          assert any(n.endswith("getlec.sh") for n in names), "缺 getlec.sh"
-          assert any(n.endswith("setup.command") for n in names), "缺 setup.command"
+          assert any(n.endswith("tools/getlec.sh") for n in names), "缺 tools/getlec.sh"
+          assert any(n.endswith("0-首次安装.command") for n in names), "缺 0-首次安装.command"
           assert any(n.endswith("dist/bookmarks.html") for n in names), "缺 bookmarks.html"
           assert any(n.endswith("/lists/") for n in names), "缺 lists/ 空目录"
 

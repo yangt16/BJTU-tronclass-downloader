@@ -47,5 +47,5 @@ echo [day] no filter, downloading everything
 
 :run
 echo.
-call "%~dp0getlec.cmd" %*
+call "%~dp0tools\getlec.cmd" %*
 exit /b %ERRORLEVEL%

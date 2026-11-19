@@ -23,7 +23,7 @@
  *   b) F12 → Sources → 左侧 >> → 代码片段 → 新建代码片段
  *   c) 把本文件全部内容粘进编辑器
  *   d) Ctrl+Enter 运行
- *   e) 下载出 <课程名>.txt；双击 getlec.cmd 会自动收编并下载
+ *   e) 下载出 <课程名>.txt；双击 1-下视频和音频.cmd 会自动收编并下载
  */
 (async () => {
   const m = location.pathname.match(/course\/(\d+)/);
@@ -122,5 +122,5 @@
   a.remove();
 
   console.log(`[scrape] 完成：${rows.length} 节 -> ${course}.txt`);
-  alert(`已导出 ${rows.length} 节到「下载」文件夹的 ${course}.txt\n\n接下来双击 getlec.cmd 即可自动开始下载。`);
+  alert(`已导出 ${rows.length} 节到「下载」文件夹的 ${course}.txt\n\n接下来双击 1-下视频和音频.cmd 即可自动开始下载。`);
 })();

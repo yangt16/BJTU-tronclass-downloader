@@ -1,6 +1,6 @@
 @echo off
 REM ===========================================================
-REM  getlec.cmd - download lectures listed in lists\*.txt
+REM  tools\getlec.cmd - download lectures listed in lists\*.txt
 REM
 REM  The only entry point. Create lists\MyCourse.txt yourself,
 REM  paste playback URLs into it (one per line), run this file.
@@ -8,10 +8,10 @@ REM  The list name becomes the course name and the folder name:
 REM      lists\MYCOURSE.txt   gives   media\MYCOURSE\
 REM
 REM  usage:
-REM     getlec.cmd                    download everything in lists\
-REM     getlec.cmd --all              same as above
-REM     getlec.cmd lists\MYCOURSE.txt only that one list
-REM     getlec.cmd lists\X.txt INSTRUCTOR   pick another track
+REM     tools\getlec.cmd             download everything in lists\
+REM     tools\getlec.cmd --all         same as above
+REM     tools\getlec.cmd lists\MYCOURSE.txt   only that list
+REM     tools\getlec.cmd lists\X.txt INSTRUCTOR   another track
 REM
 REM  HARD RULES FOR THIS FILE:
 REM    1. ASCII ONLY. Not even Chinese in comments -- cmd.exe
@@ -23,8 +23,8 @@ REM       floods and loops before.
 REM ===========================================================
 setlocal
 chcp 65001 >nul
-set "ROOT=%~dp0"
-if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
+REM this file lives in tools\ - the project root is its parent
+for %%I in ("%~dp0..") do set "ROOT=%%~fI"
 set "FIRST=%~1"
 set "TRACK=%~2"
 

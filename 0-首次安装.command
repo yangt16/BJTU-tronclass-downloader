@@ -1,6 +1,6 @@
 #!/bin/sh
-# setup.command - one-time setup for macOS / Linux.
-# Double-click this file in Finder (macOS) or run ./setup.command.
+# 0-首次安装.command - one-time setup for macOS / Linux.
+# Double-click this file in Finder (macOS) or run ./0-首次安装.command.
 set -u
 
 ROOT=$(cd "$(dirname "$0")" && pwd)
@@ -70,10 +70,10 @@ echo
 echo " next:"
 echo "   1. put a course list into lists/ (see docs/使用说明.md)"
 echo "   2. double-click one of the .command entries in this folder:"
-echo "        下视频和音频.command   (video + audio)"
-echo "        只要音轨.command       (audio only)"
-echo "        只要视频.command       (video only)"
-echo "        只下某一天.command     (one day only)"
+echo "        1-下视频和音频.command   (video + audio)"
+echo "        2-只要音轨.command       (audio only)"
+echo "        3-只要视频.command       (video only)"
+echo "        4-只下某一天.command     (one day only)"
 echo "============================================================"
 printf "\nPress Enter to close..."
 read -r _ || true

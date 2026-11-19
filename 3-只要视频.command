@@ -3,4 +3,4 @@
 cd "$(dirname "$0")" || exit 1
 GETLEC_DROPVIDEO=; export GETLEC_DROPVIDEO
 GETLEC_NOAUDIO=1; export GETLEC_NOAUDIO
-exec ./getlec.sh "$@"
+exec ./tools/getlec.sh "$@"

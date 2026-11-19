@@ -83,7 +83,7 @@ must_in_usage = [
     "test_naming", "test_modes", "sec-ch", "断点续传",
 ]
 must_in_readme = [
-    "docs/使用说明.md", "下视频和音频.cmd", "只要音轨.cmd", "只要视频.cmd",
+    "docs/使用说明.md", "1-下视频和音频.cmd", "2-只要音轨.cmd", "3-只要视频.cmd",
     "免责声明", "增量下载",
 ]
 for kw in must_in_usage:

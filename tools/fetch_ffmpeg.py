@@ -2,7 +2,7 @@
 fetch_ffmpeg.py - 下载 ffmpeg 的 Windows 构建，抽出 ffmpeg.exe / ffprobe.exe 放进 bin\\。
 
 为什么需要它：ffmpeg.exe 单文件就 100 MB，超过 GitHub 单文件 100 MB 的限制，
-所以仓库里不含它。新机器 clone 下来先跑一次本脚本（或双击根目录 setup.cmd）。
+所以仓库里不含它。新机器 clone 下来先跑一次本脚本（或双击根目录 0-首次安装.cmd）。
 
 用法:
     python tools\\fetch_ffmpeg.py            下载并安装到 bin\\

@@ -1,17 +1,17 @@
 #!/bin/sh
-# getlec.sh - download every lecture listed in lists/*.txt  (macOS / Linux)
+# tools/getlec.sh - download lectures listed in lists/*.txt (macOS / Linux)
 #
 # Same engine as getlec.cmd, just POSIX shell. Modes come from the same
 # environment variables: GETLEC_DROPVIDEO / GETLEC_NOAUDIO / GETLEC_ONLY /
 # GETLEC_EXCLUDE / GETLEC_FORCE / GETLEC_KEEPLIST / GETLEC_DRYRUN.
 #
-# usage:
-#   ./getlec.sh                        everything in lists/
-#   ./getlec.sh lists/MYCOURSE.txt     only that list
-#   ./getlec.sh lists/X.txt INSTRUCTOR pick another track
+# usage (run from the project root):
+#   sh tools/getlec.sh                 everything in lists/
+#   sh tools/getlec.sh lists/MYCOURSE.txt    only that list
+#   sh tools/getlec.sh lists/X.txt INSTRUCTOR  another track
 set -u
 
-ROOT=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT" || exit 1
 
 # ---------- find python ----------

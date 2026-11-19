@@ -30,4 +30,4 @@ else
     echo "[day] no filter, downloading everything"
 fi
 
-exec ./getlec.sh "$@"
+exec ./tools/getlec.sh "$@"

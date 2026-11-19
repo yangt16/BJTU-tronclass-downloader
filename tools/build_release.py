@@ -45,7 +45,7 @@ START_HERE = """\
 
 第一步（一次性）
 ---------------
-双击 setup.cmd
+双击 0-首次安装.cmd
   它会检测 Python、确认 ffmpeg 就绪、建好 lists\\ 文件夹。
   本包已含 ffmpeg，所以这一步只需几秒。
 
@@ -62,10 +62,10 @@ START_HERE = """\
 第三步：下载
 -----------
 双击以下任一个：
-   下视频和音频.cmd     视频 + 音轨都留（默认）
-   只要音轨.cmd         只留音轨，省空间（只做转写用这个）
-   只要视频.cmd         只留视频
-   只下某一天.cmd       只下指定的某一天
+   1-下视频和音频.cmd   视频 + 音轨都留（默认）
+   2-只要音轨.cmd       只留音轨，省空间（只做转写用这个）
+   3-只要视频.cmd       只留视频
+   4-只下某一天.cmd     只下指定的某一天
 
 产物在 media\\<课程名>\\<日期>\\ 下。
 
@@ -89,9 +89,9 @@ START_HERE_MAC = """\
 
     chmod +x *.command *.sh
     brew install ffmpeg python3      # Linux: sudo apt install ffmpeg python3
-    ./setup.command
+    ./0-首次安装.command
 
-  setup.command 会检查 python3 与 ffmpeg、建好 lists/ 文件夹。
+  0-首次安装.command 会检查 python3 与 ffmpeg、建好 lists/ 文件夹。
 
 第二步：拿到课程地址
 -------------------
@@ -106,10 +106,10 @@ START_HERE_MAC = """\
 第三步：下载
 -----------
 双击以下任一个（Finder 里就是中文名字的 .command 文件）：
-   下视频和音频.command     视频 + 音轨都留（默认）
-   只要音轨.command         只留音轨，省空间（只做转写用这个）
-   只要视频.command         只留视频
-   只下某一天.command       只下指定的某一天
+   1-下视频和音频.command   视频 + 音轨都留（默认）
+   2-只要音轨.command       只留音轨，省空间（只做转写用这个）
+   3-只要视频.command       只留视频
+   4-只下某一天.command     只下指定的某一天
 
 若双击提示“无法验证开发者”：右键文件，选“打开”，再确认一次。
 若提示权限不足：终端里执行 chmod +x *.command *.sh
@@ -225,7 +225,7 @@ def main():
         ff = [ROOT / "bin" / n for n in ("ffmpeg.exe", "ffprobe.exe")]
         missing = [p.name for p in ff if not p.exists()]
         if missing:
-            raise SystemExit(f"缺少 {missing}；先跑一次 setup.cmd 再打包")
+            raise SystemExit(f"缺少 {missing}；先跑一次 0-首次安装.cmd 再打包")
         sh, lf, gpl = ensure_assets(a.no_gpl_text)
         extras = [sh, lf, gpl]
     else:

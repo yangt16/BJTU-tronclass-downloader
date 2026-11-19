@@ -24,7 +24,8 @@ def fail(msg):
     print(f"[FAIL] {msg}")
 
 
-for p in sorted(ROOT.glob("*.cmd")):
+cmd_files = sorted(set(list(ROOT.glob("*.cmd")) + list((ROOT / "tools").glob("*.cmd"))))
+for p in cmd_files:
     raw = p.read_bytes()
 
     non_ascii = [i for i, b in enumerate(raw) if b > 127]

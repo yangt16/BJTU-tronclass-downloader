@@ -29,7 +29,8 @@ def check(name, ok, detail=""):
         bad += 1
 
 
-scripts = sorted(list(ROOT.glob("*.sh")) + list(ROOT.glob("*.command")))
+scripts = sorted(set(list(ROOT.glob("*.sh")) + list(ROOT.glob("*.command"))
+                     + list((ROOT / "tools").glob("*.sh"))))
 check("找到 shell 入口脚本", len(scripts) >= 6, f"实际 {len(scripts)} 个")
 
 for p in scripts:
@@ -39,16 +40,17 @@ for p in scripts:
     if os.name != "nt":
         check(f"{p.name}: 可执行位", os.access(p, os.X_OK))
 
-# 入口必须都转发到 getlec.sh（避免逻辑重复）
+# 入口必须都转发到 tools/getlec.sh（避免逻辑重复）
 for p in scripts:
-    if p.name in ("getlec.sh", "setup.command"):
+    if p.name in ("getlec.sh", "0-首次安装.command"):
         continue
     text = p.read_text(encoding="utf-8", errors="replace")
-    check(f"{p.name}: 调用 getlec.sh", "./getlec.sh" in text)
+    check(f"{p.name}: 调用 tools/getlec.sh", "./tools/getlec.sh" in text)
 
 # 主脚本必须真的存在
-check("getlec.sh 存在", (ROOT / "getlec.sh").exists())
-check("getlec.sh 调用 lectures.py", "tools/lectures.py" in (ROOT / "getlec.sh").read_text(encoding="utf-8"))
+check("tools/getlec.sh 存在", (ROOT / "tools" / "getlec.sh").exists())
+check("tools/getlec.sh 调用 lectures.py",
+      "tools/lectures.py" in (ROOT / "tools" / "getlec.sh").read_text(encoding="utf-8"))
 
 print()
 print("全部通过" if bad == 0 else f"{bad} 项失败")

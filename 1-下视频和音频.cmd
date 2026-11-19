@@ -4,5 +4,5 @@ REM Double-click this file, or drag a list txt onto it.
 setlocal
 set "GETLEC_DROPVIDEO="
 set "GETLEC_NOAUDIO="
-call "%~dp0getlec.cmd" %*
+call "%~dp0tools\getlec.cmd" %*
 exit /b %ERRORLEVEL%

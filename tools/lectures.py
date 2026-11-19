@@ -77,7 +77,7 @@ LIST_TEMPLATE = """# ===========================================================
 #     4. 右键那一行 -> 复制 -> 复制 URL
 #     5. 粘到本文件末尾，一行一个
 #
-#  粘完双击 getlec.cmd 就会下载。
+#  粘完双击 1-下视频和音频.cmd 就会下载。
 #  产物: media\\{course}\\<日期>\\{course}_<日期>.mp4 + .m4a
 #
 #  跑完本文件自动归档进 har_archive\\urls_<日期>.txt，并重建一个空的。
@@ -338,7 +338,7 @@ def main():
     if not (FFMPEG.exists() or shutil.which("ffmpeg")):
         print("[error] 没找到 ffmpeg，抽音轨需要它：")
         print("        macOS : brew install ffmpeg")
-        print("        Windows: 双击 setup.cmd 自动下载")
+        print("        Windows: 双击 0-首次安装.cmd 自动下载")
         return 1
 
     # 落点由清单文件名决定：lists\X.txt -> media\X\

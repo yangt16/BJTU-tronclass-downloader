@@ -1,6 +1,6 @@
 @echo off
 REM ===========================================================
-REM  setup.cmd - one-time setup for a fresh copy of this folder.
+REM  first-run setup for a fresh copy of this folder.
 REM
 REM  What it does:
 REM    1. finds a working Python
@@ -47,9 +47,9 @@ echo.
 
 REM ---------- 2. ffmpeg ----------
 REM any arguments are forwarded to fetch_ffmpeg.py, e.g.
-REM   setup.cmd --check         only check
-REM   setup.cmd --force         re-download
-REM   setup.cmd --dest D:\x     install somewhere else
+REM   this-file --check      only check
+REM   this-file --force      re-download
+REM   this-file --dest D:\x  install somewhere else
 echo [setup] step 1/3: ffmpeg
 "%PYEXE%" "%ROOT%\tools\fetch_ffmpeg.py" %*
 if errorlevel 1 goto fffail
@@ -74,8 +74,8 @@ echo  setup done.
 echo.
 echo  next:
 echo    1. put a course list into lists\ (see docs for how)
-echo    2. double-click one of the three .cmd entries in this
-echo       folder: both / audio only / video only
+echo    2. double-click one of the numbered .cmd entries in
+echo       this folder: 1 video+audio, 2 audio, 3 video, 4 one day
 echo ============================================================
 if "%GETLEC_NOPAUSE%"=="" pause
 exit /b 0

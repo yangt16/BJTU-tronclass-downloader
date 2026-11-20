@@ -106,7 +106,7 @@ def _save_state(path, state):
     os.replace(tmp, path)
 
 
-def download_segmented(url, out_path, segments=4, quiet=False):
+def download_segmented(url, out_path, segments=4, quiet=False, progress_cb=None):
     """同一个文件用多个连接分段下载；各段写各自的字节区间，下完就是完整文件。
 
     进度存在 X.mp4.segstate 里：中途中断后重跑会从各段的断点继续。
@@ -145,9 +145,14 @@ def download_segmented(url, out_path, segments=4, quiet=False):
     t0 = time.time()
 
     def report():
+        done = progress["bytes"]
+        if progress_cb:
+            try:
+                progress_cb(done, total)
+            except Exception:
+                pass
         if quiet:
             return
-        done = progress["bytes"]
         el = time.time() - t0
         print(f"  {done/1e6:8.1f}/{total/1e6:.1f} MB  {done/total*100:5.1f}%"
               f"  {done/el/1e6 if el else 0:5.1f} MB/s", end="\r", flush=True)
@@ -207,14 +212,16 @@ def download_segmented(url, out_path, segments=4, quiet=False):
     return out
 
 
-def download(url, out_path, quiet=False, segments=1):
+def download(url, out_path, quiet=False, segments=1, progress_cb=None):
     """按块下载到 out_path，已存在的部分会续传。
 
     quiet=True 时不打印进度（多节并发下载时用，避免输出互相踩）。
     segments>1 时走单文件多连接分段下载。
+    progress_cb(已下载字节, 总字节) 用于并发模式下显示每节进度。
     """
     if segments and int(segments) > 1:
-        return download_segmented(url, out_path, int(segments), quiet=quiet)
+        return download_segmented(url, out_path, int(segments), quiet=quiet,
+                                  progress_cb=progress_cb)
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -251,6 +258,11 @@ def download(url, out_path, quiet=False, segments=1):
                         print(f"  重试 {attempt+1}/5: {type(ex).__name__} {str(ex)[:60]}")
                     time.sleep(2 * (attempt + 1))
             have = out.stat().st_size
+            if progress_cb:
+                try:
+                    progress_cb(have, total)
+                except Exception:
+                    pass
             if not quiet:
                 el = time.time() - t0
                 print(f"  {have/1e6:8.1f}/{total/1e6:.1f} MB  {have/total*100:5.1f}%"

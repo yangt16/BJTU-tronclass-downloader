@@ -220,6 +220,23 @@ try:
         seg3 = BASE / "seg3.bin"
         download(handler.url("/media.bin"), seg3, segments=7)
         check("分段不整除字节一致", seg3.read_bytes() == DATA)
+
+        # ---------- 10. 进度回调 ----------
+        seen = []
+        out_cb = BASE / "cb.bin"
+        download(handler.url("/media.bin"), out_cb,
+                 progress_cb=lambda d, t: seen.append((d, t)))
+        check("普通下载回调到总长", bool(seen) and seen[-1][0] == len(DATA),
+              seen[-1] if seen else None)
+        check("回调进度单调",
+              all(b >= a for (a, _), (b, _) in zip(seen, seen[1:])), True)
+        seen2 = []
+        out_cb2 = BASE / "cb2.bin"
+        download(handler.url("/media.bin"), out_cb2, segments=4,
+                 progress_cb=lambda d, t: seen2.append((d, t)))
+        check("分段下载回调到总长",
+              bool(seen2) and seen2[-1][0] == len(DATA),
+              seen2[-1] if seen2 else None)
 finally:
     shutil.rmtree(BASE, ignore_errors=True)
 

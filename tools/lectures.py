@@ -455,6 +455,43 @@ def plan_sections(groups, outdir, mode, track, force=False, dry_run=False):
     return todo, skipped
 
 
+def progress_due(last_pct, last_t, pct, now, min_pct=5, min_sec=3.0):
+    """并发模式下每节进度是否该打印：涨了 5% 或距上次 3 秒。"""
+    if pct <= last_pct:
+        return False
+    return pct - last_pct >= min_pct or now - last_t >= min_sec or pct >= 100
+
+
+def fmt_mb(n):
+    """字节 -> 适合报告里看的 MB（大数取整，小数保留 1 位）。"""
+    v = n / 1e6
+    return f"{v:.0f} MB" if v >= 100 else f"{v:.1f} MB"
+
+
+def check_media(path, probe=None):
+    """用 ffprobe 校验文件可读且时长正常。返回 (ok, 说明)。
+
+    probe 可覆盖 ffprobe 命令（测试用）。
+    """
+    cmd = list(probe) if probe else [str(FFPROBE)]
+    try:
+        r = subprocess.run(
+            cmd + ["-v", "error", "-show_entries", "format=duration",
+                   "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace")
+    except Exception as e:
+        return False, f"ffprobe 无法运行: {e}"
+    if r.returncode != 0:
+        return False, (r.stderr or "").strip()[:160] or "ffprobe 返回非 0"
+    try:
+        dur = float((r.stdout or "").strip())
+    except ValueError:
+        return False, f"读不到时长: {(r.stdout or '').strip()[:80]}"
+    if dur <= 1:
+        return False, f"时长异常: {dur:.1f}s"
+    return True, f"{dur/60:.1f} 分钟"
+
+
 def notify_done():
     """跑完提示：终端响铃 + Windows 提示音 / macOS beep。"""
     try:
@@ -520,6 +557,11 @@ def main():
     # 缺 ffmpeg 时直接给一句人话，而不是等抽音轨阶段抛 FileNotFoundError
     if not (FFMPEG.exists() or shutil.which("ffmpeg")):
         print("[error] 没找到 ffmpeg，抽音轨需要它：")
+        print("        macOS : brew install ffmpeg")
+        print("        Windows: 双击 0-首次安装.cmd 自动下载")
+        return 1
+    if not (FFPROBE.exists() or shutil.which("ffprobe")):
+        print("[error] 没找到 ffprobe（通常和 ffmpeg 一起安装）：")
         print("        macOS : brew install ffmpeg")
         print("        Windows: 双击 0-首次安装.cmd 自动下载")
         return 1
@@ -603,9 +645,27 @@ def main():
     if n_skip:
         print(f"[skip] 已下载 {n_skip} 节，本次实际需下载 {len(todo)} 节")
 
-    counters = {"new": 0}
+    counters = {"new": 0, "bytes_video": 0, "bytes_audio": 0}
     failed_jobs = []
     t_start = time.time()
+
+    def make_reporter(idx, job):
+        """并发模式下每节进度回调（节流：每涨 5% 或每 3 秒打一行）。"""
+        state = {"pct": -1, "t": 0.0}
+
+        def cb(done, total):
+            if total <= 0:
+                return
+            pct = int(done * 100 / total)
+            now = time.time()
+            if not progress_due(state["pct"], state["t"], pct, now):
+                return
+            state["pct"] = pct
+            state["t"] = now
+            with PRINT_LOCK:
+                print(f"  [{idx}/{len(todo)}] {job['label']} {pct:3d}%  "
+                      f"{done/1e6:.1f}/{total/1e6:.1f} MB")
+        return cb
 
     def process_job(job, idx, total, retry=False):
         """下载并处理一节；返回 True 表示成功。"""
@@ -614,16 +674,31 @@ def main():
             print(f"\n=== {prefix}第 {idx}/{total} 节: {job['label']}"
                   f"  轨: {[track_of(u) for u in job['urls']]} ===")
             print(f"  [下载] -> {job['mp4'].name}")
+        cb = make_reporter(idx, job) if jobs > 1 and not a.dry_run else None
         try:
-            download(job["pick"], job["mp4"], quiet=jobs > 1, segments=segments)
+            download(job["pick"], job["mp4"], quiet=jobs > 1,
+                     segments=segments, progress_cb=cb)
         except Exception as e:
             with PRINT_LOCK:
                 print(f"  下载失败: {e}")
             return False
 
-        if mode == "video":
+        # 完整性校验：ffprobe 读不出正常时长就当失败，删掉等重试
+        ok, why = check_media(job["mp4"])
+        if not ok:
             with PRINT_LOCK:
-                print(f"      视频 {job['mp4'].name}  {job['mp4'].stat().st_size/1e6:.1f} MB")
+                print(f"  [校验] 录像不完整（{why}），已删除")
+            try:
+                job["mp4"].unlink()
+            except Exception:
+                pass
+            return False
+
+        if mode == "video":
+            size = job["mp4"].stat().st_size
+            with PRINT_LOCK:
+                counters["bytes_video"] += size
+                print(f"      视频 {job['mp4'].name}  {size/1e6:.1f} MB")
                 print("  [信息]")
                 print("      " + info_of(job["mp4"]).replace("\n", "\n      "))
                 print(f"\n  视频用这个: {job['mp4']}")
@@ -633,8 +708,20 @@ def main():
             print(f"  [抽音频] -> {job['m4a'].name}")
         if not extract_audio(job["mp4"], job["m4a"]):
             return False
+        ok, why = check_media(job["m4a"])
+        if not ok:
+            with PRINT_LOCK:
+                print(f"  [校验] 音轨不完整（{why}），已删除")
+            try:
+                job["m4a"].unlink()
+            except Exception:
+                pass
+            return False
+        m4a_size = job["m4a"].stat().st_size
         with PRINT_LOCK:
-            print(f"      {job['m4a'].name}  {job['m4a'].stat().st_size/1e6:.1f} MB")
+            counters["bytes_video"] += job["mp4"].stat().st_size
+            counters["bytes_audio"] += m4a_size
+            print(f"      {job['m4a'].name}  {m4a_size/1e6:.1f} MB")
             if a.drop_video:
                 freed = job["mp4"].stat().st_size
                 job["mp4"].unlink()
@@ -697,10 +784,21 @@ def main():
                     failed_jobs.append(job)
 
     failed = len(failed_jobs)
+    elapsed = time.time() - t_start
     print(f"\n[小结] 新下载 {counters['new']} 节 / 跳过 {n_skip} 节 /"
-          f" 失败 {failed} 节  用时 {fmt_dur(time.time() - t_start)}")
+          f" 失败 {failed} 节  用时 {fmt_dur(elapsed)}")
     if retried:
         print(f"[retry] {retried} 节重试，其中 {retried - failed} 节成功")
+    if counters["new"]:
+        parts = []
+        if counters["bytes_video"]:
+            parts.append(f"录像 {fmt_mb(counters['bytes_video'])}")
+        if counters["bytes_audio"]:
+            parts.append(f"音轨 {fmt_mb(counters['bytes_audio'])}")
+        total_bytes = counters["bytes_video"] + counters["bytes_audio"]
+        speed = total_bytes / elapsed / 1e6 if elapsed else 0
+        print(f"[报告] 新下载 {counters['new']} 节 · {' + '.join(parts)} · "
+              f"用时 {fmt_dur(elapsed)} · 平均 {speed:.1f} MB/s")
     if failed:
         fp = write_failed_log(failed_jobs, outdir)
         if fp:

@@ -67,10 +67,12 @@ fake = BASE / "fakebin"
 fake.mkdir()
 if os.name == "nt":
     (fake / "ffmpeg.cmd").write_text("@exit /b 0\r\n", encoding="ascii")
+    (fake / "ffprobe.cmd").write_text("@exit /b 0\r\n", encoding="ascii")
 else:
-    p = fake / "ffmpeg"
-    p.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    p.chmod(0o755)
+    for name in ("ffmpeg", "ffprobe"):
+        p = fake / name
+        p.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        p.chmod(0o755)
 
 urls = BASE / "list.txt"
 urls.write_text(

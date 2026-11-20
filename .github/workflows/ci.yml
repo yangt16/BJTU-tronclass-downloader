@@ -49,6 +49,7 @@ jobs:
           # 放一个假的让它通过 lectures.py 的启动检查
           New-Item -ItemType Directory -Force -Path tmp\fakebin | Out-Null
           Set-Content -Path 'tmp\fakebin\ffmpeg.cmd' -Value '@exit /b 0' -Encoding ascii
+          Set-Content -Path 'tmp\fakebin\ffprobe.cmd' -Value '@exit /b 0' -Encoding ascii
           $env:PATH = "$PWD\tmp\fakebin;$env:PATH"
           $env:GETLEC_DRYRUN = '1'
           $env:GETLEC_NOPAUSE = '1'
@@ -167,7 +168,8 @@ jobs:
           set -e
           mkdir -p lists tmp/fakebin
           printf '#!/bin/sh\nexit 0\n' > tmp/fakebin/ffmpeg
-          chmod +x tmp/fakebin/ffmpeg
+          printf '#!/bin/sh\nexit 0\n' > tmp/fakebin/ffprobe
+          chmod +x tmp/fakebin/ffmpeg tmp/fakebin/ffprobe
           export PATH="$PWD/tmp/fakebin:$PATH"
           printf '%s\n' "$CI_FAKE_URL" > lists/ci.txt
           export GETLEC_DRYRUN=1 GETLEC_NOPAUSE=1 GETLEC_LOG=1

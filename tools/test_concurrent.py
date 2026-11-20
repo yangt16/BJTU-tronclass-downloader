@@ -91,7 +91,10 @@ LIST.write_text("".join(f"{URL}/{d}/{s}/ENCODER-a?ts=1&token=x\n" for d, s in it
                 encoding="utf-8")
 DEST = BASE / "out"
 
-# 打桩：跳过 ffprobe 校验和响铃
+# 打桩：跳过 ffprobe 校验和响铃；启动检查也指向已存在的 python 可执行文件
+# （CI 的 Linux/Windows runner 上没有 ffmpeg/ffprobe）
+lectures.FFMPEG = pathlib.Path(sys.executable)
+lectures.FFPROBE = pathlib.Path(sys.executable)
 lectures.check_media = lambda path, probe=None: (True, "打桩")
 lectures.notify_done = lambda: None
 

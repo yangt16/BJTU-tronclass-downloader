@@ -227,6 +227,8 @@ if __name__ == "__main__":
         sys.exit(0)
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if not sys.stdin.isatty():
+            sys.stdin.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
     try:

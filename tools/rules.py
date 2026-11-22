@@ -22,11 +22,14 @@ import sys
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if not sys.stdin.isatty():          # 管道/脚本输入时按 UTF-8 解码
+        sys.stdin.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LISTS = ROOT / "lists"
+MEDIA = ROOT / "media"
 WEEK_CN = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五",
            6: "周六", 7: "周日"}
 KEYS = ("only", "exclude")
@@ -125,24 +128,45 @@ def resolve_filters(cli_only, cli_exclude, rule):
     return list(cli_only or []), list(cli_exclude or []), "命令行"
 
 
-def discover(lists_dir):
-    """返回 [(txt路径, 规则dict, errors)]，只收非空清单。"""
-    out = []
-    for txt in sorted(pathlib.Path(lists_dir).glob("*.txt")):
+def media_courses(media_dir=None):
+    """media 目录下已下载过的课程名（用于给清单已归档的课程配规则）。"""
+    media_dir = pathlib.Path(media_dir) if media_dir else MEDIA
+    if not media_dir.exists():
+        return []
+    return sorted(d.name for d in media_dir.iterdir() if d.is_dir())
+
+
+def discover(lists_dir, media_dir=None):
+    """返回课程候选列表，每项:
+
+    {"name": 课程名, "txt": Path 或 None, "rule": dict, "errors": list}
+
+    来源 = lists 下的 txt（有清单）+ media 下的课程（清单可能已归档）。
+    """
+    lists_dir = pathlib.Path(lists_dir)
+    out, seen = [], set()
+    for txt in sorted(lists_dir.glob("*.txt")):
         rule, errors = load(rules_path_for(txt))
-        out.append((txt, rule, errors))
+        out.append({"name": txt.stem, "txt": txt, "rule": rule, "errors": errors})
+        seen.add(txt.stem)
+    for name in media_courses(media_dir):
+        if name in seen:
+            continue
+        rule, errors = load(lists_dir / f"{name}.rules")
+        out.append({"name": name, "txt": None, "rule": rule, "errors": errors})
     return out
 
 
-def cmd_list(lists_dir):
-    items = discover(lists_dir)
+def cmd_list(lists_dir, media_dir=None):
+    items = discover(lists_dir, media_dir)
     if not items:
-        print(f"[规则] {lists_dir} 里没有清单")
+        print(f"[规则] {lists_dir} 里没有清单，media 里也没有课程")
         return 0
-    print(f"[规则] {lists_dir} 下 {len(items)} 份清单:")
-    for txt, rule, errors in items:
-        print(f"  {txt.name:24s} {describe(rule)}")
-        for e in errors:
+    print(f"[规则] 可配置的课程（{len(items)} 个）:")
+    for it in items:
+        mark = "" if it["txt"] else "  [无清单]"
+        print(f"  {it['name']:24s} {describe(it['rule'])}{mark}")
+        for e in it["errors"]:
             print(f"    !! 规则有误: {e}")
     return 0
 
@@ -156,11 +180,8 @@ def find_txt(lists_dir, name):
 
 
 def cmd_set(lists_dir, name, only_text, exclude_text):
+    name = pathlib.Path(name).stem
     txt = find_txt(lists_dir, name)
-    if not txt.exists():
-        print(f"[规则] 找不到清单: {txt}")
-        print("       规则文件名要跟清单同名（先有 lists\\<课程>.txt）")
-        return 1
     only, err1 = normalize_tokens(only_text)
     exclude, err2 = normalize_tokens(exclude_text)
     bad = err1 + err2
@@ -171,7 +192,11 @@ def cmd_set(lists_dir, name, only_text, exclude_text):
     kept = save(path, {"only": only, "exclude": exclude})
     if kept:
         print(f"[规则] 已写入 {path.name}: {describe({'only': only, 'exclude': exclude})}")
-        print("       下次双击 1-开始下载.cmd 就会按这个规则跑（跑完保留清单）")
+        if txt.exists():
+            print("       下次双击 1-开始下载.cmd 就会按这个规则跑（跑完保留清单）")
+        else:
+            print(f"       注意：清单 {txt.name} 还不在 lists\\，规则先存着，")
+            print("       等清单放进来后自动生效")
     else:
         print(f"[规则] 规则已清空（{path.name} 已删除），恢复全部下载")
     return 0
@@ -188,23 +213,34 @@ def cmd_clear(lists_dir, name):
     return 0
 
 
-def interactive(lists_dir):
-    items = discover(lists_dir)
-    if not items:
-        print(f"[规则] {lists_dir} 里还没有清单。先把抓取导出的 txt 放进 lists\\ 再配置。")
-        return 1
+def interactive(lists_dir, media_dir=None):
+    items = discover(lists_dir, media_dir)
     print("=" * 60)
     print("[规则] 按课程配置下载规则")
     print("=" * 60)
     print("\n请选择课程:")
-    for i, (txt, rule, _) in enumerate(items, 1):
-        print(f"  {i}) {txt.stem:20s} 当前: {describe(rule)}")
+    for i, it in enumerate(items, 1):
+        mark = "" if it["txt"] else "  [无清单]"
+        print(f"  {i}) {it['name']:20s} 当前: {describe(it['rule'])}{mark}")
+    manual = len(items) + 1
+    print(f"  {manual}) 手动输入课程名（新课/清单还没放进来）")
+
     while True:
         s = input("> ").strip()
-        if s.isdigit() and 1 <= int(s) <= len(items):
-            txt = items[int(s) - 1][0]
+        if s.isdigit() and 1 <= int(s) <= manual:
+            if int(s) == manual:
+                name = input("课程名（= 清单文件名，不带 .txt）: ").strip()
+                name = pathlib.Path(name).stem
+                if not name:
+                    print("  !! 课程名不能为空")
+                    continue
+                txt = pathlib.Path(lists_dir) / f"{name}.txt"
+            else:
+                txt = items[int(s) - 1]["txt"]
+                if txt is None:
+                    txt = pathlib.Path(lists_dir) / f"{items[int(s) - 1]['name']}.txt"
             break
-        print(f"  !! 请输入 1-{len(items)}")
+        print(f"  !! 请输入 1-{manual}")
 
     print(f"\n给 {txt.stem} 设置规则:")
     print("  1) 全部下载（删除规则）")
@@ -254,6 +290,7 @@ def interactive(lists_dir):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--lists-dir", default="", help="覆盖清单目录（测试用）")
+    ap.add_argument("--media-dir", default="", help="覆盖媒体库目录（测试用）")
     sub = ap.add_subparsers(dest="cmd")
 
     sub.add_parser("list", help="列出清单与规则")
@@ -268,9 +305,10 @@ def main(argv=None):
 
     a = ap.parse_args(argv)
     lists_dir = pathlib.Path(a.lists_dir) if a.lists_dir else LISTS
+    media_dir = pathlib.Path(a.media_dir) if a.media_dir else None
 
     if a.cmd == "list":
-        return cmd_list(lists_dir)
+        return cmd_list(lists_dir, media_dir)
     if a.cmd == "set":
         if not a.only and not a.exclude:
             print("[规则] 用 --only / --exclude 指定规则；要清空请用 clear")
@@ -278,7 +316,7 @@ def main(argv=None):
         return cmd_set(lists_dir, a.name, a.only, a.exclude)
     if a.cmd == "clear":
         return cmd_clear(lists_dir, a.name)
-    return interactive(lists_dir)
+    return interactive(lists_dir, media_dir)
 
 
 if __name__ == "__main__":

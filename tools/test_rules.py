@@ -80,9 +80,15 @@ try:
         "# 注释\nhttps://h/videos/outbound1/bjtu/room1/20261104/080000-095500-1/ENCODER-b?ts=1\n",
         encoding="utf-8")
 
-    def run(*args, stdin=None):
-        return subprocess.run([sys.executable, str(HERE / "rules.py"),
-                               "--lists-dir", str(LISTS)] + list(args),
+    EMPTY_MEDIA = BASE / "empty_media"
+    EMPTY_MEDIA.mkdir(exist_ok=True)
+
+    def run(*args, stdin=None, media=EMPTY_MEDIA):
+        base = [sys.executable, str(HERE / "rules.py"),
+                "--lists-dir", str(LISTS)]
+        if media is not None:
+            base += ["--media-dir", str(media)]
+        return subprocess.run(base + list(args),
                               input=stdin, capture_output=True, text=True,
                               encoding="utf-8", errors="replace", cwd=str(ROOT))
 
@@ -93,13 +99,31 @@ try:
     r = run("list")
     check("CLI list 列出规则", "排除 周二" in r.stdout, True)
 
-    r = run("set", "不存在", "--only", "4")
-    check("CLI set 缺清单报错", r.returncode, 1)
+    r = run("set", "新课", "--only", "4")
+    check("CLI set 无清单也允许", r.returncode, 0)
+    check("无清单时规则已存", (LISTS / "新课.rules").exists(), True)
 
     r = run("clear", "AA")
     check("CLI clear 删除规则", (r.returncode, (LISTS / "AA.rules").exists()), (0, False))
 
-    # ---------- 交互式 ----------
+    # ---------- 已下载但无清单的课程也能配 ----------
+    media = BASE / "media"
+    (media / "CC课程").mkdir(parents=True)
+    found = rules.discover(LISTS, media_dir=media)
+    names = {it["name"]: it for it in found}
+    check("discover 含 media 课程", "CC课程" in names, True)
+    check("media 课程无清单", names["CC课程"]["txt"], None)
+    r = run("set", "CC课程", "--only", "4")
+    check("无清单课程可 set", (r.returncode, (LISTS / "CC课程.rules").exists()),
+          (0, True))
+
+    # ---------- 交互式：手动输入课程名 ----------
+    r = run(media=media, stdin="4\nDD课程\n2\n4\n")
+    check("交互式手动建规则退出码", r.returncode, 0)
+    rule, _ = rules.load(LISTS / "DD课程.rules")
+    check("手动课程规则写入", rule["only"], ["4"])
+
+    # ---------- 交互式（原有路径）----------
     r = run(stdin="1\n2\n4\n")   # 选第 1 门课 -> 只下星期几 -> 周四
     check("交互式退出码", r.returncode, 0)
     rule, _ = rules.load(LISTS / "AA.rules")

@@ -12,49 +12,56 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from get_media import probe, resolve  # noqa: E402
-from lectures import (ROOT, already_done, labels_parts, load_urls,  # noqa: E402
-                      group_by_label, label_of, target_paths, track_of)
+from lectures import (ROOT, already_done, entries_from_urls, ensure_real,  # noqa: E402
+                      entry_track, group_by_label, labels_parts, load_urls,
+                      resolve_entries, target_paths)
 
 
 def check_list(path):
-    urls = load_urls(path)
-    if not urls:
+    entries = load_urls(path)
+    if not entries:
         print(f"  （{pathlib.Path(path).name} 没有地址，跳过）\n")
         return 0
 
-    # 间接地址先换成直链，否则解析不出日期/时段
-    if any("previewToken=" in u for u in urls):
-        print(f"  换成直链 {len(urls)} 条 ...")
-        urls = [resolve(u) for u in urls]
+    # 间接地址先换成直链，否则解析不出日期/时段；只解析要用的轨
+    if any("previewToken=" in e["url"] for e in entries):
+        resolve_entries(entries)
 
     course = pathlib.Path(path).stem
     outdir = ROOT / "media" / course
     print(f"落点: {outdir}\n")
 
-    groups = group_by_label(urls)
+    groups = group_by_label(entries)
 
     bad = 0
     done = 0
     print(f"{'状态':<10} {'大小':>10}  {'落点'}")
     print("-" * 68)
-    for key, us in groups.items():
-        label = label_of(us[0])
+    for key, es in groups.items():
+        label = key
         date, span = labels_parts(label)
         multi = (outdir / date / ".multi").exists()
         base = f"{course}_{date}" + (f"_{span}" if multi and span else "")
         mp4, m4a = target_paths(outdir, label)
         if already_done(mp4, m4a, "any"):
             # 已下载的节不再探测：长期清单里旧地址多半已过期，探测只会刷假的失败
-            print(f"[已下载] {'':>10}  {course}\\{date}\\{base}.mp4  ({track_of(us[0])})")
+            print(f"[已下载] {'':>10}  {course}\\{date}\\{base}.mp4  ({entry_track(es[0])})")
             done += 1
             continue
-        for u in us:
+        for e in es:
+            try:
+                u = ensure_real(e)
+            except Exception as ex:
+                print(f"[FAIL] {'':>10}  {course}\\{date}\\{base}.mp4  ({entry_track(e)})")
+                print(f"        !! 解析失败: {ex}")
+                bad += 1
+                continue
             ok, total, err = probe(u)
             if not ok:
                 bad += 1
             size = f"{total/1e6:.1f} MB" if total else "-"
             print(f"[{'OK' if ok else 'FAIL'}] {size:>10}  "
-                  f"{course}\\{date}\\{base}.mp4  ({track_of(u)})")
+                  f"{course}\\{date}\\{base}.mp4  ({entry_track(e)})")
             if err:
                 print(f"        !! {err}")
         print()

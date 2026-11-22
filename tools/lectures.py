@@ -142,8 +142,8 @@ def label_of(url):
         return "lecture"
 
 
-def group_by_label(urls):
-    """按「日期+时段」分组，而不是按完整目录。
+def group_by_label(entries):
+    """按「日期+时段」分组（entries 是 dict：track/url/real/label）。
 
     为什么不能用目录分组：同一节课的三条轨可能被存在**不同目录**里
     （实测：20261111 / 20261023 / 20261106 的 INSTRUCTOR/STUDENTS 就在
@@ -151,8 +151,8 @@ def group_by_label(urls):
     日期+时段是这一节课的稳定标识。
     """
     groups = {}
-    for u in urls:
-        groups.setdefault(label_of(u), []).append(u)
+    for e in entries:
+        groups.setdefault(entry_label(e), []).append(e)
     return groups
 
 
@@ -234,6 +234,109 @@ def track_of(url):
     return name.split("-")[0].upper() or "MEDIA"
 
 
+def entry_label(e):
+    return e.get("label") or label_of(e.get("real") or e["url"])
+
+
+def entry_track(e):
+    t = (e.get("track") or "").upper()
+    if t:
+        return t
+    real = e.get("real") or ""
+    if real and "previewToken=" not in real:
+        return track_of(real)
+    return ""
+
+
+def entry_url(e):
+    return e.get("real") or e["url"]
+
+
+def entries_from_urls(urls):
+    """把地址列表变成 entries（测试/兼容用；直链会自动带上轨名与标签）。"""
+    out = []
+    for u in urls:
+        preview = "previewToken=" in u
+        out.append({"track": "" if preview else track_of(u),
+                    "url": u,
+                    "real": "" if preview else u,
+                    "label": "" if preview else label_of(u)})
+    return out
+
+
+CAP_HASH_RE = re.compile(r"/captures/([^/]+)/videos/")
+
+
+def hash_of(url):
+    m = CAP_HASH_RE.search(url)
+    return m.group(1) if m else ""
+
+
+def ensure_real(e):
+    """确保这条轨有真实直链（需要时才解析）。"""
+    if e.get("real"):
+        return e["real"]
+    real = resolve(e["url"])
+    e["real"] = real
+    e["label"] = label_of(real)
+    return real
+
+
+def resolve_entries(entries, workers=8):
+    """只解析要用的轨：同一节课（capture hash）只解析 ENCODER（没有就第一条）。
+
+    54 条三轨清单 -> 只发 18 次 302；其余轨等到真要下时才解析。
+    """
+    by_hash, loose = {}, []
+    for i, e in enumerate(entries):
+        h = hash_of(e["url"])
+        if h:
+            by_hash.setdefault(h, []).append(e)
+        else:
+            loose.append(e)
+    picks = []
+    for es in by_hash.values():
+        enc = [e for e in es if entry_track(e) == "ENCODER"]
+        picks.append(enc[0] if enc else es[0])
+    picks.extend(loose)
+    print(f"[resolve] 清单 {len(entries)} 条（约 {len(by_hash) + len(loose)} 节），"
+          f"只解析要用的 {len(picks)} 条 ...")
+    from concurrent.futures import ThreadPoolExecutor
+
+    def work(e):
+        try:
+            real = resolve(e["url"])
+        except Exception as ex:
+            print(f"  ! 解析失败: {e['url'][-40:]}  {ex}")
+            return
+        e["real"] = real
+        e["label"] = label_of(real)
+        print(f"  {e['url'][-42:]}  ->  {real[-46:]}")
+
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(picks)))) as pool:
+        list(pool.map(work, picks))
+
+    # 同一节课的其它轨共享标签
+    for es in by_hash.values():
+        labels = [e["label"] for e in es if e.get("label")]
+        if labels:
+            for e in es:
+                e["label"] = e.get("label") or labels[0]
+    # 整节都没解析出来 -> 逐条兜底
+    for es in by_hash.values():
+        if any(e.get("label") for e in es):
+            continue
+        print(f"  ! 这一节没解析出来，逐条重试: {es[0]['url'][-40:]}")
+        for e in es:
+            try:
+                ensure_real(e)
+            except Exception as ex:
+                print(f"    ! {ex}")
+        labels = [e["label"] for e in es if e.get("label")]
+        for e in es:
+            e["label"] = e.get("label") or (labels[0] if labels else "lecture")
+
+
 def labels_parts(label):
     """'20261014_150100-160500' -> ('20261014', '150100-160500')"""
     date, _, span = label.partition("_")
@@ -290,16 +393,28 @@ def guard_previous(daydir, label, course, date):
 
 
 def load_urls(path):
-    """读清单：一行一个地址，忽略空行和 # 注释。"""
+    """读清单：每行 `[TRACK] 地址`，忽略空行和 # 注释。
+
+    书签导出行如 `ENCODER https://.../preview?previewToken=...`；
+    手写清单可以只写地址（轨名会等解析后从文件名认出来）。
+    """
     out = []
     for line in pathlib.Path(path).read_text(encoding="utf-8-sig").splitlines():
-        u = line.strip()
-        if not u or u.startswith("#"):
+        s = line.strip()
+        if not s or s.startswith("#"):
             continue
-        if not u.lower().startswith("http"):
-            print(f"  ! 跳过非 URL 行: {u[:60]}")
+        track, url = "", s
+        parts = s.split(None, 1)
+        if (len(parts) == 2 and re.fullmatch(r"[A-Za-z]+", parts[0])
+                and parts[1].lower().startswith("http")):
+            track, url = parts[0].upper(), parts[1].strip()
+        if not url.lower().startswith("http"):
+            print(f"  ! 跳过无法识别的行: {s[:60]}")
             continue
-        out.append(u)
+        preview = "previewToken=" in url
+        out.append({"track": track, "url": url,
+                    "real": "" if preview else url,
+                    "label": "" if preview else label_of(url)})
     print(f"[urls] {path} 里读到 {len(out)} 条地址")
     return out
 
@@ -458,26 +573,26 @@ def plan_sections(groups, outdir, mode, track, force=False, dry_run=False,
     dry_run 时 todo 只用于打印，archived 为空。
     """
     todo, skipped, archived = [], [], []
-    for label, us in groups.items():
-        want = [u for u in us if track_of(u) == track.upper()]
-        pick = want[0] if want else us[0]
+    for label, es in groups.items():
+        want = [e for e in es if entry_track(e) == track.upper()]
+        pick = want[0] if want else es[0]
         date = labels_parts(label)[0]
 
         if dry_run:
             mp4, m4a = target_paths(outdir, label)
             print(f"\n=== 第 {len(todo) + 1}/{len(groups)} 节: {label}"
-                  f"  轨: {[track_of(u) for u in us]} ===")
+                  f"  轨: {[entry_track(e) or '?' for e in es]} ===")
             print(f"  将写入: {mp4}")
             if mode != "video":
                 print(f"          {m4a}")
-            todo.append({"label": label, "date": date, "pick": pick, "urls": us,
-                         "mp4": mp4, "m4a": m4a})
+            todo.append({"label": label, "date": date, "pick": pick,
+                         "entries": es, "mp4": mp4, "m4a": m4a})
             continue
 
         outdir.mkdir(parents=True, exist_ok=True)
         guard_previous(outdir / date, label, course_name(outdir), date)
         mp4, m4a = target_paths(outdir, label)
-        job = {"label": label, "date": date, "pick": pick, "urls": us,
+        job = {"label": label, "date": date, "pick": pick, "entries": es,
                "mp4": mp4, "m4a": m4a, "span": labels_parts(label)[1]}
         if not force and already_done(mp4, m4a, mode):
             skipped.append(date)
@@ -627,28 +742,19 @@ def main():
     if log_fh:
         print(f"[log] 同时写入 {log_fh.name}")
 
-    urls = load_urls(a.urls)
-    if not urls:
+    entries = load_urls(a.urls)
+    if not entries:
         # 空清单是正常状态（比如先建好文件、之后再粘地址），不算失败
         print(f"  {a.urls} 里没有可用地址，跳过")
         return 0
 
     # 清单里可能是「间接地址」（incast 的 preview?previewToken=...）。
     # 它 302 到真正的签名直链，这个跳转不需要登录态，本地就能换。
-    # 换过之后 URL 里才带日期/时段/轨道，才能命名和分组。
-    if any("previewToken=" in u for u in urls):
-        print(f"[resolve] 发现间接地址，换成直链（{len(urls)} 条）...")
-        fixed = []
-        for u in urls:
-            r = resolve(u)
-            if r != u:
-                print(f"  {u[-42:]}  ->  {r[-46:]}")
-            else:
-                print(f"  {u[-42:]}  ->  (未变化，可能已过期)")
-            fixed.append(r)
-        urls = fixed
+    # 带轨名前缀时，每节课只解析真正要下的那条（默认 ENCODER），其余轨等用到再说。
+    if any("previewToken=" in e["url"] for e in entries):
+        resolve_entries(entries)
 
-    groups = group_by_label(urls)
+    groups = group_by_label(entries)
 
     # 筛选优先级：清单规则（lists\<课程>.rules）> 命令行/环境变量
     rule_path = rules.rules_path_for(a.urls)
@@ -748,11 +854,17 @@ def main():
         prefix = "重试 " if retry else ""
         with PRINT_LOCK:
             print(f"\n=== {prefix}第 {idx}/{total} 节: {job['label']}"
-                  f"  轨: {[track_of(u) for u in job['urls']]} ===")
+                  f"  轨: {[entry_track(e) or '?' for e in job['entries']]} ===")
             print(f"  [下载] -> {job['mp4'].name}")
         cb = make_reporter(idx, job) if jobs > 1 and not a.dry_run else None
         try:
-            download(job["pick"], job["mp4"], quiet=jobs > 1,
+            pick_url = ensure_real(job["pick"])
+        except Exception as e:
+            with PRINT_LOCK:
+                print(f"  解析失败: {e}")
+            return False
+        try:
+            download(pick_url, job["mp4"], quiet=jobs > 1,
                      segments=segments, progress_cb=cb)
         except Exception as e:
             with PRINT_LOCK:

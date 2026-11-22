@@ -9,8 +9,9 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
-from lectures import (confirm_start, effective_segments, plan_sections,  # noqa: E402
-                     resolve_jobs, resolve_segments, target_paths)
+from lectures import (confirm_start, effective_segments, entries_from_urls,  # noqa: E402
+                     entry_url, plan_sections, resolve_jobs,
+                     resolve_segments, target_paths)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -36,9 +37,9 @@ def url(date, span, track=""):
 L1 = "20261030_101000-120500"
 L2 = "20261104_080000-095500"
 groups = {
-    L1: [url("20261030", "101000-120500-1", "STUDENTS"),
-         url("20261030", "101000-120500-1")],
-    L2: [url("20261104", "080000-095500-1")],
+    L1: entries_from_urls([url("20261030", "101000-120500-1", "STUDENTS"),
+                           url("20261030", "101000-120500-1")]),
+    L2: entries_from_urls([url("20261104", "080000-095500-1")]),
 }
 
 BASE = ROOT / "tmp" / f"testplan_{__import__('os').getpid()}"
@@ -51,7 +52,8 @@ try:
     check("全未下载 -> todo 2", len(todo), 2)
     check("全未下载 -> archived 0", len(archived), 0)
     check("全未下载 -> skipped 0", len(skipped), 0)
-    check("优先选 ENCODER 轨", todo[0]["pick"], groups[L1][1])
+    check("优先选 ENCODER 轨", entry_url(todo[0]["pick"]),
+          groups[L1][1]["url"])
     check("落点文件名正确", todo[0]["mp4"].name, "out1_20261030.mp4")
     check("已建目录", (out1 / "20261030").exists(), True)
 

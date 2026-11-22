@@ -92,7 +92,7 @@ Windows 的 ffmpeg 由 `0-首次安装.cmd` 自动下载；macOS / Linux 用包�
 D:\course-notes\lists\XX课程.txt
 ```
 
-一行一个播放地址（`#` 开头是注释）。地址怎么拿，见使用说明的
+每行「轨名 + 播放地址」（书签自动导出；`#` 开头是注释）。地址怎么拿，见使用说明的
 [手动版](docs/使用说明.md#手动版自己粘地址) 或
 [自动版（书签）](docs/使用说明.md#自动版书签一次抓一门课)。
 
@@ -185,7 +185,7 @@ D:\course-notes\
 ├─ LICENSE                    MIT 许可证
 ├─ CHANGELOG.md               版本更新日志
 ├─ bin\                       ffmpeg / ffprobe
-├─ tools\                     36 个脚本（下载、编排、抓取、测试）
+├─ tools\                     37 个脚本（下载、编排、抓取、测试）
 │  ├─ getlec.cmd / getlec.sh  主脚本（各入口都调用它）
 │  └─ ...                     其余工具与测试
 ├─ dist\                      抓取书签（install.html / bookmarks.html）

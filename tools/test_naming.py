@@ -13,8 +13,8 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
-from lectures import (ROOT as LROOT, clean_course_name, group_by_label,  # noqa: E402
-                     guard_previous, resolve_outdir, target_paths)
+from lectures import (ROOT as LROOT, clean_course_name, entries_from_urls,  # noqa: E402
+                     group_by_label, guard_previous, resolve_outdir, target_paths)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -90,7 +90,7 @@ u1 = [
     base + "STUDENTS-abc?ts=1&token=x",
     base + "INSTRUCTOR-abc?ts=1&token=x",
 ]
-g = group_by_label(u1)
+g = group_by_label(entries_from_urls(u1))
 check("分组 同目录", len(g) == 1 and len(next(iter(g.values()))) == 3, list(g))
 
 # 6) 分组：三条轨里有一条在**不同目录**（实测发生过）-> 仍应是 1 组
@@ -99,7 +99,7 @@ u2 = [
     base + "STUDENTS-abc?ts=1&token=x",
     "https://i/videos/o/site/Room/20261111/080000-095500-2/INSTRUCTOR-abc?ts=1&token=x",
 ]
-g = group_by_label(u2)
+g = group_by_label(entries_from_urls(u2))
 check("分组 跨目录同节", len(g) == 1 and len(next(iter(g.values()))) == 3, list(g))
 
 # 7) 分组：不同日期 -> 2 组
@@ -107,7 +107,7 @@ u3 = [
     base + "ENCODER-abc?ts=1&token=x",
     "https://i/videos/o/site/Room/20261112/080000-095500-1/ENCODER-abc?ts=1&token=x",
 ]
-check("分组 不同日期", len(group_by_label(u3)) == 2, list(group_by_label(u3)))
+check("分组 不同日期", len(group_by_label(entries_from_urls(u3))) == 2, list(group_by_label(entries_from_urls(u3))))
 
 # 4) 课程名清洗 / 落点推导
 check("清掉 (1) 后缀", clean_course_name("XX课程 (1)") == "XX课程",

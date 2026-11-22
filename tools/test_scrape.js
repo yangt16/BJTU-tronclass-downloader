@@ -117,7 +117,8 @@ global.document = {
     ['只查了已开始的 15 节', detailCalls.length === 15],
     ['文件名是 测试课程.txt', downloadedName === '测试课程.txt'],
     ['清单里 15 条地址', lines.length === 15],
-    ['只导了 ENCODER', lines.length > 0 && lines.every(u => u.includes('previewToken=enc'))],
+    ['每行都是 TRACK URL', lines.every(l => /^[A-Z]+ https?:\/\//.test(l))],
+    ['只导了 ENCODER', lines.length > 0 && lines.every(u => u.startsWith('ENCODER ') && u.includes('previewToken=enc'))],
     ['未开始的节没被下载', !lines.some(u => u.includes('270000') || u.includes('270001'))],
     ['有表头注释', comments.length > 0 && comments[0].startsWith('# 测试课程')],
   ];

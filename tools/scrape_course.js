@@ -104,13 +104,16 @@
   // ---------- 4. 生成清单 ----------
   const lines = [
     `# ${course} · 自动抓取于 ${new Date().toLocaleString()}`,
-    `# 共 ${rows.length} 节；每行一条 preview 地址，本地程序会换成签名直链`,
+    `# 共 ${rows.length} 节；每行「轨名 + preview 地址」，本地程序只解析要下的轨`,
   ];
   for (const r of rows) {
     lines.push(`# ${r.date} ${r.title}`);
     const pick = allTracks ? r.videos : r.videos.filter(v => v.camera_type === 'encoder');
     if (!pick.length) { lines.push(`# (无 encoder 轨，已跳过)`); continue; }
-    for (const v of pick) lines.push(v.url);
+    for (const v of pick) {
+      const tr = (v.camera_type || '').toUpperCase();
+      lines.push(tr ? `${tr} ${v.url}` : v.url);
+    }
   }
 
   const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' });

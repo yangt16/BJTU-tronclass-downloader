@@ -102,8 +102,13 @@ def count_sections(path):
     """
     urls = []
     for line in pathlib.Path(path).read_text(encoding="utf-8-sig").splitlines():
-        u = line.strip()
-        if u and not u.startswith("#") and u.lower().startswith("http"):
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        parts = s.split(None, 1)
+        u = parts[1].strip() if (len(parts) == 2
+                                and parts[1].lower().startswith("http")) else s
+        if u.lower().startswith("http"):
             urls.append(u)
     if not urls:
         return 0

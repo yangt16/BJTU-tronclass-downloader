@@ -23,9 +23,14 @@ def listed():
         return out
     for p in sorted(LISTS.glob("*.txt")):
         try:
-            n = sum(1 for line in p.read_text(encoding="utf-8-sig").splitlines()
-                    if line.strip() and not line.strip().startswith("#")
-                    and line.strip().lower().startswith("http"))
+            n = 0
+            for line in p.read_text(encoding="utf-8-sig").splitlines():
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                tail = s.split(None, 1)[-1]
+                if tail.lower().startswith("http"):
+                    n += 1
         except Exception:
             n = 0
         out.append((p, n))

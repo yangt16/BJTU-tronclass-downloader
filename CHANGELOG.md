@@ -13,6 +13,7 @@
   - `--redownload` / `GETLEC_REDOWNLOAD=1` 强制重下
   - 台账记录产物类型（video/audio），切换模式不会误跳过
   - `python tools\ledger.py --stats / --clear` 查看/清空
+  - `--import-media` 扫描 `media\` 里已有的下载补录台账（不联网，支持一天多场次）
 - **批量全局进度**：`lists\` 里有多份清单时，先统计总数，再打印跨清单的全局进度
   `[batch] 全局 7/32 节 已用 … 预计剩余 …`；批次循环移到 `tools\batch.py`
   （Windows / macOS 共用一份，退出码会传回入口）

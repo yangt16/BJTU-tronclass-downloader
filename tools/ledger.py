@@ -92,6 +92,86 @@ def satisfies(entry, mode):
     return bool(entry.get("video")) and bool(entry.get("audio"))
 
 
+SPAN_RE = __import__("re").compile(r"_(\d{6}-\d{6})$")
+
+
+def _session_span(daydir):
+    """从 .session 取时段（单场次日期用）。"""
+    tag = daydir / ".session"
+    if tag.exists():
+        try:
+            label = tag.read_text(encoding="utf-8-sig").strip()
+            if "_" in label:
+                return label.split("_", 1)[1]
+        except Exception:
+            pass
+    return ""
+
+
+def _media_groups(daydir):
+    """把一天的媒体文件按"场次"分组：{span: [files]}。
+
+    单场次日期文件名不带时段 -> span 用 .session 里的时段。
+    多场次日期文件名带 `_HHMMSS-HHMMSS` -> 每个时段一组。
+    """
+    files = [f for f in daydir.iterdir()
+             if f.is_file() and f.suffix in (".mp4", ".m4a")]
+    if not files:
+        return {}
+    groups = {}
+    for f in files:
+        m = SPAN_RE.search(f.stem)
+        span = m.group(1) if m else _session_span(daydir)
+        groups.setdefault(span, []).append(f)
+    return groups
+
+
+def import_media(media_dir=None, path=None, dry_run=False):
+    """扫描 media 目录，把已存在的下载补进台账。
+
+    返回 (新增节数, 已有节数, 无媒体目录数)。
+    """
+    media_dir = pathlib.Path(media_dir) if media_dir else (ROOT / "media")
+    path = pathlib.Path(path) if path else LEDGER_PATH
+    existing, _ = load(path)
+    added = existed = skipped = 0
+    new_entries = []
+    if not media_dir.exists():
+        return 0, 0, 0
+    for course_dir in sorted(d for d in media_dir.iterdir() if d.is_dir()):
+        for daydir in sorted(d for d in course_dir.iterdir() if d.is_dir()):
+            if len(daydir.name) != 8 or not daydir.name.isdigit():
+                continue
+            groups = _media_groups(daydir)
+            if not groups:
+                skipped += 1
+                continue
+            for span, files in groups.items():
+                k = key(course_dir.name, daydir.name, span)
+                if k in existing:
+                    existed += 1
+                    continue
+                new_entries.append({
+                    "course": course_dir.name,
+                    "date": daydir.name,
+                    "span": span,
+                    "video": any(f.suffix == ".mp4" for f in files),
+                    "audio": any(f.suffix == ".m4a" for f in files),
+                    "bytes": sum(f.stat().st_size for f in files),
+                    "at": time.strftime(
+                        "%Y-%m-%d %H:%M:%S",
+                        time.localtime(max(f.stat().st_mtime for f in files))),
+                })
+                added += 1
+    if not dry_run and new_entries:
+        with _LOCK:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a", encoding="utf-8") as fh:
+                for e in new_entries:
+                    fh.write(__import__("json").dumps(e, ensure_ascii=False) + "\n")
+    return added, existed, skipped
+
+
 def stats(path=None):
     """返回 (记录数, 坏行数, 覆盖课程数)。"""
     data, bad = load(path)
@@ -104,6 +184,12 @@ def _main(argv=None):
         n, bad, courses = stats()
         print(f"[台账] {LEDGER_PATH}")
         print(f"  记录 {n} 节，覆盖 {courses} 门课" + (f"，坏行 {bad}" if bad else ""))
+        return 0
+    if "--import-media" in argv:
+        added, existed, skipped = import_media(dry_run="--dry-run" in argv)
+        tag = "预览" if "--dry-run" in argv else "已写入"
+        print(f"[台账] 扫描 media 完成（{tag}）：新增 {added} 节，"
+              f"已有 {existed} 节，无媒体目录 {skipped} 个")
         return 0
     if "--clear" in argv:
         try:

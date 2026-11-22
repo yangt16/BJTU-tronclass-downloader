@@ -115,6 +115,44 @@ try:
         redownload=True, course="C课")
     check("redownload 忽略台账", (len(todo3), len(archived3)), (2, 0))
 
+    # ---------- 从 media 回填台账 ----------
+    media_root = BASE / "backfill_media"
+    d1 = media_root / "C1课" / "20261014"
+    d1.mkdir(parents=True)
+    (d1 / "X_20261014.mp4").write_bytes(b"v" * 100)
+    (d1 / "X_20261014.m4a").write_bytes(b"a" * 50)
+    (d1 / ".session").write_text("20261014_101000-120500", encoding="utf-8")
+
+    d2 = media_root / "C1课" / "20261021"
+    d2.mkdir(parents=True)
+    (d2 / "X_20261021.m4a").write_bytes(b"a" * 60)
+    (d2 / ".session").write_text("20261021_080000-095500", encoding="utf-8")
+
+    d3 = media_root / "C2课" / "20261104"
+    d3.mkdir(parents=True)
+    (d3 / "Y_20261104_150100-160500.mp4").write_bytes(b"v" * 10)
+    (d3 / "Y_20261104_162000-181500.mp4").write_bytes(b"v" * 20)
+
+    (media_root / "C2课" / "20261105").mkdir(parents=True)   # 空目录
+
+    BP = BASE / "backfill.jsonl"
+    added, existed, skipped = ledger.import_media(
+        media_dir=media_root, path=BP)
+    check("回填新增节数", added, 4)
+    check("回填跳过空目录", skipped, 1)
+    data_b, bad_b = ledger.load(BP)
+    check("回填记录数", len(data_b), 4)
+    k1 = ledger.key("C1课", "20261014", "101000-120500")
+    check("单场次时段来自 .session",
+          (data_b[k1]["video"], data_b[k1]["audio"]), (True, True))
+    k2 = ledger.key("C1课", "20261021", "080000-095500")
+    check("纯音频日", (data_b[k2]["video"], data_b[k2]["audio"]), (False, True))
+    k3 = ledger.key("C2课", "20261104", "150100-160500")
+    k4 = ledger.key("C2课", "20261104", "162000-181500")
+    check("多场次日拆两条", (k3 in data_b, k4 in data_b), (True, True))
+    added2, existed2, _ = ledger.import_media(media_dir=media_root, path=BP)
+    check("回填幂等", (added2, existed2), (0, 4))
+
     # ---------- main：菜单式询问（跳过分支）----------
     ledger.LEDGER_PATH = BASE / "main_ledger.jsonl"
     for d, sp in (("20261030", "101000-120500"), ("20261104", "080000-095500")):

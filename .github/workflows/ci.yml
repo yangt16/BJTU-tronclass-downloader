@@ -219,6 +219,9 @@ jobs:
           assert any(n.endswith("menu.py") for n in names), "缺 tools/menu.py"
           assert any(n.endswith("0-首次安装.command") for n in names), "缺 0-首次安装.command"
           assert any(n.endswith("1-开始下载.command") for n in names), "缺 1-开始下载.command"
+          assert any(n.endswith("2-清单规则.command") for n in names), "缺 2-清单规则.command"
+          assert any(n.endswith("tools/rules.py") for n in names), "缺 tools/rules.py"
+          assert any(n.endswith("tools/ledger.py") for n in names), "缺 tools/ledger.py"
           assert any(n.endswith("dist/bookmarks.html") for n in names), "缺 bookmarks.html"
           assert any(n.endswith("/lists/") for n in names), "缺 lists/ 空目录"
 

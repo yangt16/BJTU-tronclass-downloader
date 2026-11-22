@@ -213,78 +213,122 @@ def cmd_clear(lists_dir, name):
     return 0
 
 
-def interactive(lists_dir, media_dir=None):
-    items = discover(lists_dir, media_dir)
-    print("=" * 60)
-    print("[规则] 按课程配置下载规则")
-    print("=" * 60)
-    print("\n请选择课程:")
-    for i, it in enumerate(items, 1):
-        mark = "" if it["txt"] else "  [无清单]"
-        print(f"  {i}) {it['name']:20s} 当前: {describe(it['rule'])}{mark}")
-    manual = len(items) + 1
-    print(f"  {manual}) 手动输入课程名（新课/清单还没放进来）")
+def _read(prompt=""):
+    """读一行；EOF 返回 None（按退出处理）。"""
+    try:
+        return input(prompt)
+    except EOFError:
+        return None
 
+
+def interactive(lists_dir, media_dir=None):
+    """交互式配置：配完后回到课程列表，输入 q 退出。"""
     while True:
-        s = input("> ").strip()
-        if s.isdigit() and 1 <= int(s) <= manual:
+        items = discover(lists_dir, media_dir)
+        print("=" * 60)
+        print("[规则] 按课程配置下载规则（输入 q 退出）")
+        print("=" * 60)
+        print("\n请选择课程:")
+        for i, it in enumerate(items, 1):
+            mark = "" if it["txt"] else "  [无清单]"
+            print(f"  {i}) {it['name']:20s} 当前: {describe(it['rule'])}{mark}")
+        manual = len(items) + 1
+        print(f"  {manual}) 手动输入课程名（新课/清单还没放进来）")
+        print("  q) 退出")
+
+        txt = None
+        while txt is None:
+            raw = _read("> ")
+            if raw is None:
+                print("\n[规则] 已退出")
+                return 0
+            s = raw.strip()
+            if s.lower() in ("q", "quit", "exit"):
+                print("\n[规则] 已退出")
+                return 0
+            if not (s.isdigit() and 1 <= int(s) <= manual):
+                print(f"  !! 请输入 1-{manual}，或 q 退出")
+                continue
             if int(s) == manual:
-                name = input("课程名（= 清单文件名，不带 .txt）: ").strip()
-                name = pathlib.Path(name).stem
+                name = _read("课程名（= 清单文件名，不带 .txt）: ")
+                if name is None:
+                    print("\n[规则] 已退出")
+                    return 0
+                name = pathlib.Path(name.strip()).stem
                 if not name:
                     print("  !! 课程名不能为空")
                     continue
                 txt = pathlib.Path(lists_dir) / f"{name}.txt"
             else:
-                txt = items[int(s) - 1]["txt"]
-                if txt is None:
-                    txt = pathlib.Path(lists_dir) / f"{items[int(s) - 1]['name']}.txt"
-            break
-        print(f"  !! 请输入 1-{manual}")
+                it = items[int(s) - 1]
+                txt = it["txt"] if it["txt"] else pathlib.Path(lists_dir) / f"{it['name']}.txt"
 
-    print(f"\n给 {txt.stem} 设置规则:")
-    print("  1) 全部下载（删除规则）")
-    print("  2) 只下星期几")
-    print("  3) 排除星期几")
-    print("  4) 只下某几天（输入日期）")
-    while True:
-        choice = input("> ").strip()
-        if choice in ("1", "2", "3", "4"):
-            break
-        print("  !! 请输入 1-4")
+        print(f"\n给 {txt.stem} 设置规则:")
+        print("  1) 全部下载（删除规则）")
+        print("  2) 只下星期几")
+        print("  3) 排除星期几")
+        print("  4) 只下某几天（输入日期）")
+        choice = None
+        while choice not in ("1", "2", "3", "4"):
+            raw = _read("> ")
+            if raw is None:
+                print("\n[规则] 已退出")
+                return 0
+            choice = raw.strip()
+            if choice.lower() in ("q", "quit", "exit"):
+                print("\n[规则] 已退出")
+                return 0
+            if choice not in ("1", "2", "3", "4"):
+                print("  !! 请输入 1-4，或 q 退出")
 
-    only, exclude = [], []
-    if choice == "1":
-        pass
-    elif choice in ("2", "3"):
-        print("\n星期几（1=周一 … 7=周日；多个用逗号，如 2,4）:")
-        while True:
-            tokens, bad = normalize_tokens(input("> "))
-            if tokens and not bad:
-                break
-            print("  !! 只能输入 1-7")
-        if choice == "2":
-            only = tokens
+        only, exclude = [], []
+        if choice == "1":
+            pass
+        elif choice in ("2", "3"):
+            print("\n星期几（1=周一 … 7=周日；多个用逗号，如 2,4）:")
+            tokens = []
+            while not tokens:
+                raw = _read("> ")
+                if raw is None:
+                    print("\n[规则] 已退出")
+                    return 0
+                if raw.strip().lower() in ("q", "quit", "exit"):
+                    print("\n[规则] 已退出")
+                    return 0
+                tokens, bad = normalize_tokens(raw)
+                if bad or not tokens:
+                    print("  !! 只能输入 1-7，或 q 退出")
+                    tokens = []
+            if choice == "2":
+                only = tokens
+            else:
+                exclude = tokens
         else:
-            exclude = tokens
-    else:
-        print("\n日期（8 位，如 20261030；多个用逗号）:")
-        while True:
-            tokens, bad = normalize_tokens(input("> "))
-            if tokens and not bad:
-                break
-            print("  !! 要 8 位日期，如 20261030")
-        only = tokens
+            print("\n日期（8 位，如 20261030；多个用逗号）:")
+            tokens = []
+            while not tokens:
+                raw = _read("> ")
+                if raw is None:
+                    print("\n[规则] 已退出")
+                    return 0
+                if raw.strip().lower() in ("q", "quit", "exit"):
+                    print("\n[规则] 已退出")
+                    return 0
+                tokens, bad = normalize_tokens(raw)
+                if bad or not tokens:
+                    print("  !! 要 8 位日期，如 20261030，或 q 退出")
+                    tokens = []
+            only = tokens
 
-    path = rules_path_for(txt)
-    kept = save(path, {"only": only, "exclude": exclude})
-    print()
-    if kept:
-        print(f"已写入 {path.name}: {describe({'only': only, 'exclude': exclude})}")
-        print("下次双击 1-开始下载.cmd 就会按这个规则跑（跑完保留清单，不归档）。")
-    else:
-        print("规则已清空（规则文件已删除），该课程恢复全部下载。")
-    return 0
+        path = rules_path_for(txt)
+        kept = save(path, {"only": only, "exclude": exclude})
+        print()
+        if kept:
+            print(f"已写入 {path.name}: {describe({'only': only, 'exclude': exclude})}")
+            print("下次双击 1-开始下载.cmd 就会按这个规则跑（跑完保留清单，不归档）。")
+        else:
+            print("规则已清空（规则文件已删除），该课程恢复全部下载。")
+        print("\n继续配置其它课程，或输入 q 退出。")
 
 
 def main(argv=None):

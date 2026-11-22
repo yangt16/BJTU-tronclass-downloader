@@ -123,11 +123,18 @@ try:
     rule, _ = rules.load(LISTS / "DD课程.rules")
     check("手动课程规则写入", rule["only"], ["4"])
 
-    # ---------- 交互式（原有路径）----------
+    # ---------- 交互式（原有路径，EOF 当退出）----------
     r = run(stdin="1\n2\n4\n")   # 选第 1 门课 -> 只下星期几 -> 周四
     check("交互式退出码", r.returncode, 0)
     rule, _ = rules.load(LISTS / "AA.rules")
     check("交互式写规则", rule["only"], ["4"])
+
+    # ---------- 一次会话配两门，然后按 q 退出 ----------
+    r = run(stdin="1\n2\n4\n2\n3\n2\nq\n")
+    check("多课程会话退出码", r.returncode, 0)
+    rule_b, _ = rules.load(LISTS / "BB.rules")
+    check("第二门规则写入", rule_b["exclude"], ["2"])
+    check("退出提示", "[规则] 已退出" in r.stdout, True)
     # ---------- lectures 接入：清单规则优先 ----------
     import contextlib
     import io

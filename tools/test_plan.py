@@ -9,8 +9,8 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
-from lectures import (effective_segments, plan_sections, resolve_jobs,  # noqa: E402
-                     resolve_segments, target_paths)
+from lectures import (confirm_start, effective_segments, plan_sections,  # noqa: E402
+                     resolve_jobs, resolve_segments, target_paths)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -104,6 +104,25 @@ try:
     check("节级 2 路 + 4 段 -> 4", effective_segments("4", 2), 4)
     check("节级 4 路 + 4 段 -> 2", effective_segments("4", 4), 2)
     check("节级 3 路 + 8 段 -> 2", effective_segments("8", 3), 2)
+
+    # ---------- C：本清单下载前确认 ----------
+    import builtins
+    check("确认：--yes 直接开始", confirm_start(3, 0, 0, yes=True), True)
+    check("确认：无需下载直接开始", confirm_start(0, 0, 0), True)
+    check("确认：非交互自动开始", confirm_start(3, 0, 0, is_tty=False), True)
+    old_input = builtins.input
+    builtins.input = lambda prompt="": "y"
+    try:
+        y = confirm_start(3, 1, 0, is_tty=True)
+    finally:
+        builtins.input = old_input
+    check("确认：输入 y 开始", y, True)
+    builtins.input = lambda prompt="": "n"
+    try:
+        n = confirm_start(3, 1, 2, is_tty=True)
+    finally:
+        builtins.input = old_input
+    check("确认：输入 n 取消", n, False)
 finally:
     shutil.rmtree(BASE, ignore_errors=True)
 

@@ -69,6 +69,8 @@ set "SEGARG="
 if not "%GETLEC_SEGMENTS%"=="" set "SEGARG=--segments %GETLEC_SEGMENTS%"
 set "REDLARG="
 if "%GETLEC_REDOWNLOAD%"=="1" set "REDLARG=--redownload"
+set "YESARG="
+if "%GETLEC_YES%"=="1" set "YESARG=--yes"
 
 if not "%TRACK%"=="" goto hafetrack
 set "TRACK=ENCODER"
@@ -108,7 +110,7 @@ echo ============================================================
 echo [getlec] LIST %LIST%
 echo [getlec] track=%TRACK%
 echo ============================================================
-"%PY%" "%ROOT%\tools\lectures.py" --urls "%LIST%" --track "%TRACK%" %DRYARG% %DROPARG% %NOAUDIOARG% %KEEPARG% %FORCEARG% %ONLYARG% %EXCLARG% %JOBSARG% %SEGARG% %REDLARG%
+"%PY%" "%ROOT%\tools\lectures.py" --urls "%LIST%" --track "%TRACK%" %DRYARG% %DROPARG% %NOAUDIOARG% %KEEPARG% %FORCEARG% %ONLYARG% %EXCLARG% %JOBSARG% %SEGARG% %REDLARG% %YESARG%
 if errorlevel 1 goto p_failed
 echo [getlec] OK
 echo.

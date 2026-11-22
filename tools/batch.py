@@ -22,6 +22,78 @@ LISTS = ROOT / "lists"
 HASH_RE = re.compile(r"/captures/([^/]+)/videos/")
 
 
+def menu_desc(env):
+    """严格按菜单/环境变量还原"本次设置"的文字（不含每课规则）。"""
+    if env.get("GETLEC_DROPVIDEO") == "1":
+        mode = "只要音频"
+    elif env.get("GETLEC_NOAUDIO") == "1":
+        mode = "只要视频"
+    else:
+        mode = "视频 + 音频"
+    jobs = env.get("GETLEC_JOBS") or "2"
+    seg = env.get("GETLEC_SEGMENTS") or "1"
+    seg_text = "关闭" if seg in ("", "1") else f"{seg} 段"
+    filters = []
+    if env.get("GETLEC_ONLY"):
+        filters.append("只要 " + env["GETLEC_ONLY"])
+    if env.get("GETLEC_EXCLUDE"):
+        filters.append("排除 " + env["GETLEC_EXCLUDE"])
+    return {"产物": mode, "并发": f"{jobs} 路", "单节加速": seg_text,
+            "筛选": "，".join(filters) or "无（全部）"}
+
+
+def rules_summary(items):
+    """每份清单的规则（读 lists\\<课程>.rules，不联网）。
+
+    返回 [(课程名, 规则描述, 是否有规则)]。
+    """
+    import rules  # 同目录模块
+    out = []
+    for p, _n in items:
+        rule, errors = rules.load(rules.rules_path_for(p))
+        has = bool((rule.get("only") or []) or (rule.get("exclude") or [])
+                   or rule.get("mode"))
+        desc = rules.describe(rule) if has else "无（全部下载/按菜单）"
+        if errors:
+            desc += "（规则有误：" + "，".join(errors) + "）"
+        out.append((p.stem, desc, has))
+    return out
+
+
+def confirm_batch(items, env, yes=False, is_tty=None):
+    """B：批量开始前打印每课规则并确认。返回 True 继续，False 取消。"""
+    tty = sys.stdin.isatty() if is_tty is None else is_tty
+    info = menu_desc(env)
+    rows = rules_summary(items)
+    print("=" * 60)
+    print("[确认] 本次批量下载：")
+    print(f"  产物：{info['产物']}   并发：{info['并发']}   单节加速：{info['单节加速']}")
+    print(f"  筛选：{info['筛选']}")
+    print("  " + "-" * 56)
+    for name, desc, has in rows:
+        mark = "" if has else "  [无规则]"
+        print(f"  {name}: {desc}{mark}")
+    if any(has for _, _, has in rows):
+        print("  （带规则的课程按自己的规则跑，覆盖上面的产物/筛选）")
+    print("  " + "-" * 56)
+    if yes:
+        print("  --yes：直接开始")
+        return True
+    if not tty:
+        print("  非交互环境：自动开始（加 --yes 可静默）")
+        return True
+    print("  y = 开始下载，其它任意键 = 取消")
+    try:
+        ans = input("> ").strip().lower()
+    except EOFError:
+        print("[batch] 已取消")
+        return False
+    if ans in ("y", "yes", "是"):
+        return True
+    print("[batch] 已取消")
+    return False
+
+
 def count_sections(path):
     """离线估算一份清单有几节（不联网）。
 
@@ -80,6 +152,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--lists-dir", default="", help="覆盖清单目录（测试用）")
     ap.add_argument("--dry-run-lists", action="store_true", help="只列清单和节数")
+    ap.add_argument("--yes", action="store_true",
+                    help="跳过下载前确认（CI/脚本用）")
     a = ap.parse_args(argv)
 
     lists_dir = pathlib.Path(a.lists_dir) if a.lists_dir else LISTS
@@ -101,6 +175,9 @@ def main(argv=None):
         return 0
 
     env = dict(os.environ)
+    yes = a.yes or env.get("GETLEC_YES") == "1"
+    if not confirm_batch(items, env, yes=yes):
+        return 0
     env["GETLEC_BATCH_TOTAL"] = str(total)
     start = time.time()
     env["GETLEC_BATCH_START"] = f"{start:.3f}"

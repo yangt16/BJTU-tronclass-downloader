@@ -107,7 +107,7 @@ make_index.rebuild = lambda outdir: None
 def run_main():
     old_argv = sys.argv
     sys.argv = ["lectures.py", "--urls", str(LIST), "--dest", str(DEST),
-                "--no-audio", "--jobs", "3", "--keep-list"]
+                "--no-audio", "--jobs", "3", "--keep-list", "--yes"]
     buf = io.StringIO()
     try:
         with contextlib.redirect_stdout(buf):

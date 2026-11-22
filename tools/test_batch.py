@@ -87,6 +87,31 @@ try:
     out = r.stdout
     check("清单汇总行", "共 2 份清单 / 约 4 节" in out, True)
     check("每个清单都列出", "A.txt" in out and "B.txt" in out, True)
+
+    # ---------- B：批量开始前的规则汇总 + 确认 ----------
+    import builtins
+    import rules as rules_mod
+    info = batch.menu_desc({"GETLEC_DROPVIDEO": "1", "GETLEC_JOBS": "4",
+                            "GETLEC_SEGMENTS": "8", "GETLEC_ONLY": "4"})
+    check("菜单描述-产物", info["产物"], "只要音频")
+    check("菜单描述-并发", info["并发"], "4 路")
+    check("菜单描述-单节加速", info["单节加速"], "8 段")
+    check("菜单描述-筛选", info["筛选"], "只要 4")
+    rules_mod.save(p1.with_suffix(".rules"),
+                   {"only": ["4"], "exclude": [], "mode": "audio"})
+    rows = batch.rules_summary([(p1, 2), (p2, 2)])
+    check("规则汇总-A 含规则", "产物 只要音频" in rows[0][1] and rows[0][2], True)
+    check("规则汇总-B 无规则", rows[1][2], False)
+    check("非交互自动开始", batch.confirm_batch([(p1, 2)], {}, is_tty=False), True)
+    check("--yes 直接开始",
+          batch.confirm_batch([(p1, 2)], {}, yes=True, is_tty=True), True)
+    old_input = builtins.input
+    builtins.input = lambda prompt="": "n"
+    try:
+        got = batch.confirm_batch([(p1, 2)], {}, is_tty=True)
+    finally:
+        builtins.input = old_input
+    check("输入 n 取消", got, False)
 finally:
     shutil.rmtree(BASE, ignore_errors=True)
 

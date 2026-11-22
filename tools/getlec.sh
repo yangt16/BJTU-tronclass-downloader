@@ -49,6 +49,7 @@ ARGS=""
 [ -n "${GETLEC_JOBS:-}" ] && ARGS="$ARGS --jobs $GETLEC_JOBS"
 [ -n "${GETLEC_SEGMENTS:-}" ] && ARGS="$ARGS --segments $GETLEC_SEGMENTS"
 [ "${GETLEC_REDOWNLOAD:-}" = "1" ] && ARGS="$ARGS --redownload"
+[ "${GETLEC_YES:-}" = "1" ] && ARGS="$ARGS --yes"
 
 FIRST="${1:-}"
 TRACK="${2:-ENCODER}"

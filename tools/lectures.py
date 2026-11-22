@@ -422,6 +422,29 @@ def read_batch_ctx(env=None):
     return {"total": total, "before": before, "start": start}
 
 
+def confirm_start(n_todo, n_skip, n_archived, yes=False, is_tty=None):
+    """C：本清单实际下载前确认（显示本次要下几节）。返回 True 继续。"""
+    if yes or n_todo == 0:
+        return True
+    tty = sys.stdin.isatty() if is_tty is None else is_tty
+    tail = f"，台账已删 {n_archived} 节" if n_archived else ""
+    print(f"\n[确认] 本清单将下载 {n_todo} 节（跳过 {n_skip} 节{tail}）")
+    if not tty:
+        print("  非交互环境：自动开始（加 --yes 可静默）")
+        return True
+    print("  y = 开始下载，其它任意键 = 取消")
+    try:
+        ans = input("> ").strip().lower()
+    except EOFError:
+        print("[确认] 已取消")
+        return False
+    print() if ans in ("y", "yes", "是") else None
+    if ans in ("y", "yes", "是"):
+        return True
+    print("[确认] 已取消")
+    return False
+
+
 def plan_sections(groups, outdir, mode, track, force=False, dry_run=False,
                   ledger_map=None, redownload=False, course=""):
     """串行确定每节的落点、处理同一天多节改名、判断是否已下载。
@@ -558,6 +581,8 @@ def main():
                          "如 20261030 或 4")
     ap.add_argument("--exclude", action="append", default=[], metavar="日期/1-7",
                     help="跳过指定的日期/标签，写法同 --only")
+    ap.add_argument("--yes", action="store_true",
+                    help="跳过下载前确认（CI/脚本用）")
     ap.add_argument("--redownload", action="store_true",
                     help="重下'曾下载但文件已删除'的节（默认跳过，见 lists\\downloaded.jsonl）")
     ap.add_argument("--log", default="", metavar="DIR",
@@ -692,6 +717,9 @@ def main():
     ctx = read_batch_ctx()
     if n_skip:
         print(f"[skip] 已下载 {n_skip} 节，本次实际需下载 {len(todo)} 节")
+
+    if not confirm_start(len(todo), n_skip, n_archived, yes=a.yes):
+        return 0
 
     counters = {"new": 0, "bytes_video": 0, "bytes_audio": 0}
     failed_jobs = []

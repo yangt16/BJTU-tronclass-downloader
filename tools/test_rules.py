@@ -132,9 +132,9 @@ try:
 
     # ---------- 修改规则：5 返回不改 / 回车沿用 / 覆盖 ----------
     rules.save(LISTS / "AA.rules", {"only": ["4"], "exclude": []})
-    run(stdin="1\n5\nq\n")           # 选 AA -> 5 返回 -> q
+    run(stdin="1\n6\nq\n")           # 选 AA -> 6 返回 -> q
     rule, _ = rules.load(LISTS / "AA.rules")
-    check("5 返回不修改规则", rule["only"], ["4"])
+    check("6 返回不修改规则", rule["only"], ["4"])
 
     run(stdin="1\n2\n\nq\n")         # 选 AA -> 只下星期几 -> 空回车沿用 4
     rule, _ = rules.load(LISTS / "AA.rules")
@@ -144,6 +144,24 @@ try:
     rule, _ = rules.load(LISTS / "AA.rules")
     check("重新选择即覆盖", (rule["only"], rule["exclude"]), ([], ["2"]))
     rules.save(LISTS / "AA.rules", {"only": ["4"], "exclude": []})
+
+    # ---------- 产物规则（mode）----------
+    rules.save(LISTS / "AA.rules", {"only": [], "exclude": [], "mode": "audio"})
+    rule, _ = rules.load(LISTS / "AA.rules")
+    check("mode 读回", rule["mode"], "audio")
+    check("mode 可读描述", rules.describe(rule), "产物 只要音频")
+    check("resolve_mode 规则优先", rules.resolve_mode("both", rule),
+          ("audio", "清单规则"))
+    check("resolve_mode 无规则用命令行",
+          rules.resolve_mode("both", {"only": [], "exclude": [], "mode": ""}),
+          ("both", "命令行"))
+    r = run("set", "AA", "--mode", "video")
+    rule, _ = rules.load(LISTS / "AA.rules")
+    check("CLI --mode 生效", (r.returncode, rule["mode"]), (0, "video"))
+    rules.save(LISTS / "AA.rules", {"only": ["4"], "exclude": []})
+    run(stdin="1\n5\n2\nq\n")       # 选 AA -> 设置产物 -> 只要音频
+    rule, _ = rules.load(LISTS / "AA.rules")
+    check("交互式设置产物", (rule["only"], rule["mode"]), (["4"], "audio"))
 
     # ---------- 一次会话配两门，然后按 q 退出 ----------
     r = run(stdin="1\n2\n4\n2\n3\n2\nq\n")
@@ -162,7 +180,8 @@ try:
         "https://h/videos/outbound1/bjtu/room1/20261029/080000-095500-1/ENCODER-a?ts=1\n"
         "https://h/videos/outbound1/bjtu/room1/20261030/080000-095500-1/ENCODER-b?ts=1\n",
         encoding="utf-8")
-    rules.save(T / "XX课程.rules", {"only": ["4"], "exclude": []})  # 只下周四
+    rules.save(T / "XX课程.rules",
+               {"only": ["4"], "exclude": [], "mode": "audio"})  # 只下周四 + 只要音频
 
     # 没有 ffmpeg/ffprobe 的机器（CI）也能跑 dry-run：把启动检查指到 python
     ledger.LEDGER_PATH = BASE / "rules_ledger.jsonl"
@@ -181,6 +200,7 @@ try:
     check("接入后运行成功", rc, 0)
     check("打印了清单规则", "[rule] 使用清单规则" in out, True)
     check("只保留周四那一节", "20261029" in out and "20261030" not in out, True)
+    check("规则产物覆盖命令行", "[mode] 只要音轨（清单规则）" in out, True)
 finally:
     shutil.rmtree(BASE, ignore_errors=True)
 

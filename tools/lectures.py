@@ -648,8 +648,10 @@ def main():
 
     # 三种模式：都要 / 只要音轨 / 只要视频
     mode = "video" if a.no_audio else ("audio" if a.drop_video else "both")
+    mode, mode_source = rules.resolve_mode(mode, rule)
     mode_cn = {"both": "视频 + 音轨", "audio": "只要音轨", "video": "只要视频"}[mode]
-    print(f"[mode] {mode_cn}")
+    suffix = "（清单规则）" if mode_source == "清单规则" else ""
+    print(f"[mode] {mode_cn}{suffix}")
 
     jobs = resolve_jobs(a.jobs)
     segments = effective_segments(a.segments, jobs)

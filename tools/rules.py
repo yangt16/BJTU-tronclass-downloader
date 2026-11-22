@@ -32,7 +32,13 @@ LISTS = ROOT / "lists"
 MEDIA = ROOT / "media"
 WEEK_CN = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五",
            6: "周六", 7: "周日"}
-KEYS = ("only", "exclude")
+KEYS = ("only", "exclude", "mode")
+MODE_NAMES = {"both": "视频 + 音频", "audio": "只要音频", "video": "只要视频"}
+MODE_ALIASES = {
+    "both": "both", "all": "both", "视频+音频": "both", "都下": "both",
+    "audio": "audio", "音频": "audio", "只要音频": "audio",
+    "video": "video", "视频": "video", "只要视频": "video",
+}
 
 
 def rules_path_for(txt_path):
@@ -62,7 +68,7 @@ def normalize_tokens(text):
 def load(path):
     """读规则文件。返回 ({'only': [...], 'exclude': [...]}, errors)。"""
     path = pathlib.Path(path)
-    rule = {"only": [], "exclude": []}
+    rule = {"only": [], "exclude": [], "mode": ""}
     errors = []
     if not path.exists():
         return rule, errors
@@ -82,6 +88,14 @@ def load(path):
         if key not in KEYS:
             errors.append(line)
             continue
+        if key == "mode":
+            wanted = value.strip().lower()
+            mode = MODE_ALIASES.get(wanted) or MODE_ALIASES.get(value.strip())
+            if mode:
+                rule["mode"] = mode
+            else:
+                errors.append(f"mode: {value.strip()}（要 both/audio/video）")
+            continue
         tokens, bad = normalize_tokens(value)
         rule[key] = tokens
         errors += [f"{key}: {b}" for b in bad]
@@ -93,7 +107,8 @@ def save(path, rule):
     path = pathlib.Path(path)
     only = rule.get("only") or []
     exclude = rule.get("exclude") or []
-    if not only and not exclude:
+    mode = rule.get("mode") or ""
+    if not only and not exclude and not mode:
         if path.exists():
             path.unlink()
         return False
@@ -102,13 +117,18 @@ def save(path, rule):
         lines.append("only: " + ",".join(only))
     if exclude:
         lines.append("exclude: " + ",".join(exclude))
+    if mode:
+        lines.append("mode: " + mode)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return True
 
 
 def describe(rule):
-    """[..] -> '排除 周二'；为空 -> '无（全部下载）'。"""
+    """[..] -> '产物 只要音频；排除 周二'；为空 -> '无（全部下载）'。"""
     bits = []
+    mode = rule.get("mode") or ""
+    if mode:
+        bits.append("产物 " + MODE_NAMES.get(mode, mode))
     for key, name in (("only", "只要"), ("exclude", "排除")):
         values = rule.get(key) or []
         if not values:
@@ -134,6 +154,22 @@ def media_courses(media_dir=None):
     if not media_dir.exists():
         return []
     return sorted(d.name for d in media_dir.iterdir() if d.is_dir())
+
+
+def normalize_mode(value):
+    """'audio' / '只要音频' -> 'audio'；看不懂返回 None。"""
+    value = (value or "").strip()
+    return MODE_ALIASES.get(value.lower()) or MODE_ALIASES.get(value)
+
+
+def resolve_mode(cli_mode, rule):
+    """产物模式：清单规则优先；无规则 mode 才用菜单/命令行。
+
+    返回 (mode, source)，source 为 '清单规则' 或 '命令行'。
+    """
+    if rule and rule.get("mode"):
+        return rule["mode"], "清单规则"
+    return cli_mode, "命令行"
 
 
 def discover(lists_dir, media_dir=None):
@@ -179,19 +215,25 @@ def find_txt(lists_dir, name):
     return pathlib.Path(lists_dir) / f"{name}.txt"
 
 
-def cmd_set(lists_dir, name, only_text, exclude_text):
+def cmd_set(lists_dir, name, only_text, exclude_text, mode_text=""):
     name = pathlib.Path(name).stem
     txt = find_txt(lists_dir, name)
     only, err1 = normalize_tokens(only_text)
     exclude, err2 = normalize_tokens(exclude_text)
     bad = err1 + err2
+    mode = ""
+    if mode_text:
+        mode = normalize_mode(mode_text)
+        if not mode:
+            bad.append(f"mode: {mode_text}（要 both/audio/video）")
     if bad:
-        print(f"[规则] 看不懂: {', '.join(bad)}（要 8 位日期或 1-7）")
+        print(f"[规则] 看不懂: {', '.join(bad)}（日期/星期几要 8 位日期或 1-7）")
         return 1
     path = rules_path_for(txt)
-    kept = save(path, {"only": only, "exclude": exclude})
+    kept = save(path, {"only": only, "exclude": exclude, "mode": mode})
     if kept:
-        print(f"[规则] 已写入 {path.name}: {describe({'only': only, 'exclude': exclude})}")
+        print(f"[规则] 已写入 {path.name}: "
+              f"{describe({'only': only, 'exclude': exclude, 'mode': mode})}")
         if txt.exists():
             print("       下次双击 1-开始下载.cmd 就会按这个规则跑（跑完保留清单）")
         else:
@@ -256,6 +298,25 @@ def _ask_tokens(kind, current):
         print(bad_hint)
 
 
+def _ask_mode(current):
+    """问本课产物模式；返回 both/audio/video/''（清除）或 None（退出）。"""
+    print("\n产物：")
+    print("  1) 视频 + 音频" + ("   （当前）" if current == "both" else ""))
+    print("  2) 只要音频" + ("     （当前）" if current == "audio" else ""))
+    print("  3) 只要视频" + ("     （当前）" if current == "video" else ""))
+    print("  4) 跟随菜单选择（清除本课产物规则）" + ("   （当前）" if not current else ""))
+    names = {"1": "both", "2": "audio", "3": "video", "4": ""}
+    while True:
+        raw = _read("> ")
+        if raw is None or raw.strip().lower() in ("q", "quit", "exit"):
+            print("\n[规则] 已退出")
+            return None
+        s = raw.strip()
+        if s in names:
+            return names[s]
+        print("  !! 请输入 1-4，或 q 退出")
+
+
 def interactive(lists_dir, media_dir=None):
     """交互式配置：配完回到课程列表；可重复配置（覆盖=修改）；输入 q 退出。"""
     while True:
@@ -299,41 +360,51 @@ def interactive(lists_dir, media_dir=None):
         print("  2) 只下星期几")
         print("  3) 排除星期几")
         print("  4) 只下某几天（输入日期）")
-        print("  5) 返回课程列表（不改）")
+        print("  5) 设置本课产物（视频+音频 / 只要音频 / 只要视频）")
+        print("  6) 返回课程列表（不改）")
         choice = None
-        while choice not in ("1", "2", "3", "4", "5"):
+        while choice not in ("1", "2", "3", "4", "5", "6"):
             raw = _read("> ")
             if raw is None or raw.strip().lower() in ("q", "quit", "exit"):
                 print("\n[规则] 已退出")
                 return 0
             choice = raw.strip()
-            if choice not in ("1", "2", "3", "4", "5"):
-                print("  !! 请输入 1-5，或 q 退出")
-        if choice == "5":
+            if choice not in ("1", "2", "3", "4", "5", "6"):
+                print("  !! 请输入 1-6，或 q 退出")
+        if choice == "6":
             print()
             continue
 
-        only, exclude = [], []
-        if choice in ("2", "3"):
+        only = list(current["only"])
+        exclude = list(current["exclude"])
+        mode = current.get("mode", "")
+        if choice == "1":
+            only, exclude, mode = [], [], ""
+        elif choice in ("2", "3"):
             tokens = _ask_tokens("weekday",
                                  current["only"] if choice == "2" else current["exclude"])
             if tokens is None:
                 return 0
             if choice == "2":
-                only = tokens
+                only, exclude = tokens, []
             else:
-                exclude = tokens
+                only, exclude = [], tokens
         elif choice == "4":
             tokens = _ask_tokens("date", current["only"])
             if tokens is None:
                 return 0
-            only = tokens
+            only, exclude = tokens, []
+        elif choice == "5":
+            mode = _ask_mode(current.get("mode", ""))
+            if mode is None:
+                return 0
 
         path = rules_path_for(txt)
-        kept = save(path, {"only": only, "exclude": exclude})
+        kept = save(path, {"only": only, "exclude": exclude, "mode": mode})
         print()
         if kept:
-            print(f"已写入 {path.name}: {describe({'only': only, 'exclude': exclude})}")
+            print(f"已写入 {path.name}: "
+                  f"{describe({'only': only, 'exclude': exclude, 'mode': mode})}")
             print("下次双击 1-开始下载.cmd 就会按这个规则跑（跑完保留清单，不归档）。")
         else:
             print("规则已清空（规则文件已删除），该课程恢复全部下载。")
@@ -352,6 +423,8 @@ def main(argv=None):
     p_set.add_argument("name", help="课程名（清单文件名，可不带 .txt）")
     p_set.add_argument("--only", default="", help="只下这些日期/星期几")
     p_set.add_argument("--exclude", default="", help="跳过这些日期/星期几")
+    p_set.add_argument("--mode", default="",
+                       help="产物：both / audio / video（视频+音频/只要音频/只要视频）")
 
     p_clear = sub.add_parser("clear", help="取消规则")
     p_clear.add_argument("name")
@@ -363,10 +436,10 @@ def main(argv=None):
     if a.cmd == "list":
         return cmd_list(lists_dir, media_dir)
     if a.cmd == "set":
-        if not a.only and not a.exclude:
-            print("[规则] 用 --only / --exclude 指定规则；要清空请用 clear")
+        if not a.only and not a.exclude and not a.mode:
+            print("[规则] 用 --only / --exclude / --mode 指定规则；要清空请用 clear")
             return 1
-        return cmd_set(lists_dir, a.name, a.only, a.exclude)
+        return cmd_set(lists_dir, a.name, a.only, a.exclude, a.mode)
     if a.cmd == "clear":
         return cmd_clear(lists_dir, a.name)
     return interactive(lists_dir, media_dir)

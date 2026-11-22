@@ -64,6 +64,8 @@ def build_args(env=None):
         args.append("--keep-list")
     if env.get("GETLEC_FORCE") == "1":
         args.append("--force")
+    if env.get("GETLEC_REDOWNLOAD") == "1":
+        args.append("--redownload")
     for key, arg in (("GETLEC_ONLY", "--only"), ("GETLEC_EXCLUDE", "--exclude"),
                      ("GETLEC_JOBS", "--jobs"), ("GETLEC_SEGMENTS", "--segments")):
         if env.get(key):

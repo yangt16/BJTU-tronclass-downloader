@@ -48,6 +48,7 @@ ARGS=""
 [ -n "${GETLEC_EXCLUDE:-}" ] && ARGS="$ARGS --exclude $GETLEC_EXCLUDE"
 [ -n "${GETLEC_JOBS:-}" ] && ARGS="$ARGS --jobs $GETLEC_JOBS"
 [ -n "${GETLEC_SEGMENTS:-}" ] && ARGS="$ARGS --segments $GETLEC_SEGMENTS"
+[ "${GETLEC_REDOWNLOAD:-}" = "1" ] && ARGS="$ARGS --redownload"
 
 FIRST="${1:-}"
 TRACK="${2:-ENCODER}"

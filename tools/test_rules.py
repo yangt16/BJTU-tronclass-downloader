@@ -13,6 +13,7 @@ ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 import rules  # noqa: E402
 import lectures  # noqa: E402
+import ledger  # noqa: E402
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -164,6 +165,7 @@ try:
     rules.save(T / "XX课程.rules", {"only": ["4"], "exclude": []})  # 只下周四
 
     # 没有 ffmpeg/ffprobe 的机器（CI）也能跑 dry-run：把启动检查指到 python
+    ledger.LEDGER_PATH = BASE / "rules_ledger.jsonl"
     lectures.FFMPEG = pathlib.Path(sys.executable)
     lectures.FFPROBE = pathlib.Path(sys.executable)
     old_argv = sys.argv

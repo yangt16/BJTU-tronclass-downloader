@@ -7,6 +7,12 @@
 ## 未发布
 
 ### 新增
+- **下载台账** `lists\downloaded.jsonl`：每节成功下载（校验通过）记一行；
+  因空间不足删掉旧文件后再跑同一清单不会从头重下
+  - 默认跳过"曾下载但已删除"的节；菜单会问一次可选重下
+  - `--redownload` / `GETLEC_REDOWNLOAD=1` 强制重下
+  - 台账记录产物类型（video/audio），切换模式不会误跳过
+  - `python tools\ledger.py --stats / --clear` 查看/清空
 - **批量全局进度**：`lists\` 里有多份清单时，先统计总数，再打印跨清单的全局进度
   `[batch] 全局 7/32 节 已用 … 预计剩余 …`；批次循环移到 `tools\batch.py`
   （Windows / macOS 共用一份，退出码会传回入口）

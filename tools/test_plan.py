@@ -47,8 +47,9 @@ shutil.rmtree(BASE, ignore_errors=True)
 try:
     # ---------- 全未下载 ----------
     out1 = BASE / "out1"
-    todo, skipped = plan_sections(groups, out1, "both", "ENCODER")
+    todo, skipped, archived = plan_sections(groups, out1, "both", "ENCODER")
     check("全未下载 -> todo 2", len(todo), 2)
+    check("全未下载 -> archived 0", len(archived), 0)
     check("全未下载 -> skipped 0", len(skipped), 0)
     check("优先选 ENCODER 轨", todo[0]["pick"], groups[L1][1])
     check("落点文件名正确", todo[0]["mp4"].name, "out1_20261030.mp4")
@@ -58,13 +59,13 @@ try:
     mp4, m4a = target_paths(out1, L1)
     mp4.write_bytes(b"v")
     m4a.write_bytes(b"a")
-    todo, skipped = plan_sections(groups, out1, "both", "ENCODER")
+    todo, skipped, archived = plan_sections(groups, out1, "both", "ENCODER")
     check("已下载 -> skipped 1", len(skipped), 1)
     check("已下载 -> todo 剩 1", len(todo), 1)
     check("剩下的是第二节", todo[0]["label"], L2)
 
     # ---------- --force 不跳过 ----------
-    todo, skipped = plan_sections(groups, out1, "both", "ENCODER", force=True)
+    todo, skipped, archived = plan_sections(groups, out1, "both", "ENCODER", force=True)
     check("force -> todo 2", len(todo), 2)
     check("force -> skipped 0", len(skipped), 0)
 
@@ -74,12 +75,12 @@ try:
     mp4b, m4ab = target_paths(out2, L1)
     (out2 / "20261030").mkdir(exist_ok=True)
     m4ab.write_bytes(b"a")
-    todo, skipped = plan_sections(groups, out2, "audio", "ENCODER")
+    todo, skipped, archived = plan_sections(groups, out2, "audio", "ENCODER")
     check("audio 模式 m4a 存在 -> skip", len(skipped), 1)
 
     # ---------- dry-run 不建目录 ----------
     out3 = BASE / "out3"
-    todo, skipped = plan_sections(groups, out3, "both", "ENCODER", dry_run=True)
+    todo, skipped, archived = plan_sections(groups, out3, "both", "ENCODER", dry_run=True)
     check("dry-run -> todo 2", len(todo), 2)
     check("dry-run 不建落点", out3.exists(), False)
 

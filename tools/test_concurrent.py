@@ -23,6 +23,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 import lectures  # noqa: E402
+import ledger  # noqa: E402
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -95,6 +96,7 @@ DEST = BASE / "out"
 # （CI 的 Linux/Windows runner 上没有 ffmpeg/ffprobe）
 lectures.FFMPEG = pathlib.Path(sys.executable)
 lectures.FFPROBE = pathlib.Path(sys.executable)
+ledger.LEDGER_PATH = BASE / "downloaded.jsonl"   # 台账写到临时目录
 lectures.check_media = lambda path, probe=None: (True, "打桩")
 lectures.notify_done = lambda: None
 # --keep-list 分支会调 make_index；打桩避免往真实 lists\ 写 out.md

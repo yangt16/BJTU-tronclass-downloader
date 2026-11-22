@@ -26,6 +26,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import ledger  # noqa: E402  （本地模块：下载台账 lists\downloaded.jsonl）
 import rules  # noqa: E402  （本地模块：按课程规则 lists\<课程>.rules）
 from get_media import SEG_CONN_MAX, SEG_MAX, download, resolve  # noqa: E402
 
@@ -421,14 +422,19 @@ def read_batch_ctx(env=None):
     return {"total": total, "before": before, "start": start}
 
 
-def plan_sections(groups, outdir, mode, track, force=False, dry_run=False):
+def plan_sections(groups, outdir, mode, track, force=False, dry_run=False,
+                  ledger_map=None, redownload=False, course=""):
     """串行确定每节的落点、处理同一天多节改名、判断是否已下载。
 
     命名和改名都在这里一次做完，下载阶段只管传数据 —— 这样多节并发时
     才不会互相改文件名。
-    返回 (todo, skipped_dates)；dry_run 时 todo 只用于打印。
+    返回 (todo, skipped_dates, archived)：
+      todo     需要下载的节
+      skipped  文件已在本地、跳过的日期
+      archived 台账里下过但文件已删除的节（由调用方决定跳过还是重下）
+    dry_run 时 todo 只用于打印，archived 为空。
     """
-    todo, skipped = [], []
+    todo, skipped, archived = [], [], []
     for label, us in groups.items():
         want = [u for u in us if track_of(u) == track.upper()]
         pick = want[0] if want else us[0]
@@ -448,12 +454,18 @@ def plan_sections(groups, outdir, mode, track, force=False, dry_run=False):
         outdir.mkdir(parents=True, exist_ok=True)
         guard_previous(outdir / date, label, course_name(outdir), date)
         mp4, m4a = target_paths(outdir, label)
+        job = {"label": label, "date": date, "pick": pick, "urls": us,
+               "mp4": mp4, "m4a": m4a, "span": labels_parts(label)[1]}
         if not force and already_done(mp4, m4a, mode):
             skipped.append(date)
             continue
-        todo.append({"label": label, "date": date, "pick": pick, "urls": us,
-                     "mp4": mp4, "m4a": m4a})
-    return todo, skipped
+        if not force and not redownload and ledger_map:
+            entry = ledger_map.get(ledger.key(course, date, job["span"]))
+            if entry and ledger.satisfies(entry, mode):
+                archived.append(job)
+                continue
+        todo.append(job)
+    return todo, skipped, archived
 
 
 def progress_due(last_pct, last_t, pct, now, min_pct=5, min_sec=3.0):
@@ -546,6 +558,8 @@ def main():
                          "如 20261030 或 4")
     ap.add_argument("--exclude", action="append", default=[], metavar="日期/1-7",
                     help="跳过指定的日期/标签，写法同 --only")
+    ap.add_argument("--redownload", action="store_true",
+                    help="重下'曾下载但文件已删除'的节（默认跳过，见 lists\\downloaded.jsonl）")
     ap.add_argument("--log", default="", metavar="DIR",
                     help="把输出同时写进 DIR 下的日志文件（也可设 GETLEC_LOG=1 用默认 logs/）")
     ap.add_argument("--jobs", default="", metavar="N",
@@ -642,13 +656,37 @@ def main():
     extra = f"   单节 {segments} 段" if segments > 1 else ""
     print(f"[jobs] 并发 {jobs} 路{extra}")
 
-    todo, skipped_dates = plan_sections(groups, outdir, mode, a.track,
-                                        force=a.force, dry_run=a.dry_run)
+    course = course_name(outdir)
+    ledger_map, ledger_bad = ledger.load()
+    if ledger_bad:
+        print(f"[ledger] 台账有 {ledger_bad} 行无法解析，已忽略")
+    todo, skipped_dates, archived = plan_sections(
+        groups, outdir, mode, a.track, force=a.force, dry_run=a.dry_run,
+        ledger_map=ledger_map, redownload=a.redownload, course=course)
     if a.dry_run:
         return 0
 
     done_dates = list(skipped_dates)
     n_skip = len(skipped_dates)
+    n_archived = 0
+    if archived:
+        print(f"[archived] {len(archived)} 节曾下载过但文件已删除（台账有记录）")
+        redl = False
+        if sys.stdin.isatty():
+            print("   1) 跳过（默认，直接回车）   2) 重新下载")
+            try:
+                redl = input("> ").strip() == "2"
+            except EOFError:
+                redl = False
+        else:
+            print("   非交互环境：默认跳过；要重下加 --redownload")
+        if redl:
+            todo.extend(archived)
+            print(f"   -> 重新下载这 {len(archived)} 节")
+        else:
+            n_archived = len(archived)
+            done_dates.extend(j["date"] for j in archived)
+            print(f"   -> 跳过 {n_archived} 节（加 --redownload 可重下）")
     ctx = read_batch_ctx()
     if n_skip:
         print(f"[skip] 已下载 {n_skip} 节，本次实际需下载 {len(todo)} 节")
@@ -704,6 +742,8 @@ def main():
 
         if mode == "video":
             size = job["mp4"].stat().st_size
+            ledger.record(course, job["date"], job.get("span", ""),
+                          video=True, audio=False, nbytes=size)
             with PRINT_LOCK:
                 counters["bytes_video"] += size
                 print(f"      视频 {job['mp4'].name}  {size/1e6:.1f} MB")
@@ -726,8 +766,12 @@ def main():
                 pass
             return False
         m4a_size = job["m4a"].stat().st_size
+        mp4_size = job["mp4"].stat().st_size
+        ledger.record(course, job["date"], job.get("span", ""),
+                      video=(mode != "audio"), audio=True,
+                      nbytes=mp4_size + m4a_size)
         with PRINT_LOCK:
-            counters["bytes_video"] += job["mp4"].stat().st_size
+            counters["bytes_video"] += mp4_size
             counters["bytes_audio"] += m4a_size
             print(f"      {job['m4a'].name}  {m4a_size/1e6:.1f} MB")
             if a.drop_video:
@@ -793,7 +837,8 @@ def main():
 
     failed = len(failed_jobs)
     elapsed = time.time() - t_start
-    print(f"\n[小结] 新下载 {counters['new']} 节 / 跳过 {n_skip} 节 /"
+    arch = f" 已删除记录 {n_archived} 节 /" if n_archived else ""
+    print(f"\n[小结] 新下载 {counters['new']} 节 / 跳过 {n_skip} 节 /{arch}"
           f" 失败 {failed} 节  用时 {fmt_dur(elapsed)}")
     if retried:
         print(f"[retry] {retried} 节重试，其中 {retried - failed} 节成功")

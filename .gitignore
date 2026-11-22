@@ -12,6 +12,8 @@ lists/*.txt
 logs/
 tmp/
 lists/*.md
+lists/*.rules
+lists/*.off
 __pycache__/
 *.pyc
 *.segstate

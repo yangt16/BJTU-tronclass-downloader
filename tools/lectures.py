@@ -26,6 +26,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import rules  # noqa: E402  （本地模块：按课程规则 lists\<课程>.rules）
 from get_media import SEG_CONN_MAX, SEG_MAX, download, resolve  # noqa: E402
 
 try:
@@ -610,9 +611,16 @@ def main():
 
     groups = group_by_label(urls)
 
-    # 按日期/标签筛选（--only / --exclude）
-    only_specs = parse_specs(a.only)
-    excl_specs = parse_specs(a.exclude)
+    # 筛选优先级：清单规则（lists\<课程>.rules）> 命令行/环境变量
+    rule_path = rules.rules_path_for(a.urls)
+    rule, rule_errors = rules.load(rule_path)
+    if rule_errors:
+        print(f"[rule] 警告：{rule_path.name} 有看不懂的行，已忽略: {', '.join(rule_errors)}")
+    only_specs, excl_specs, filter_source = rules.resolve_filters(
+        parse_specs(a.only), parse_specs(a.exclude), rule)
+    if filter_source == "清单规则":
+        print(f"[rule] 使用清单规则: {rules.describe(rule)}（覆盖本次菜单/环境变量的筛选）")
+
     if only_specs or excl_specs:
         groups, note = filter_groups(groups, only_specs, excl_specs)
         print(f"[filter] {note}")

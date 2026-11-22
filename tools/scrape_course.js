@@ -129,11 +129,18 @@
   await Promise.all(Array.from({ length: Math.min(CONC, started.length) }, worker));
   const rows = raw.filter(Boolean);
   if (!rows.length) { alert('一条回放都没取到（这门课可能还没出回放）'); return; }
+  const missing = started.length - rows.length;
+  ui.set(`已查 ${started.length} 节${missing ? `，${missing} 节暂无回放` : ''}，正在整理清单…`);
+  // 让浏览器先把上面这句画出来，再弹 prompt（prompt 会阻塞页面渲染）
+  await new Promise(r => (typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame(r) : setTimeout(r, 0)));
 
   // ---------- 3. 课程名：从活动标题里去掉日期前缀 ----------
   const guess = (rows[0].title || '').replace(/^\d{4}-\d{2}-\d{2}-?/, '').trim() || `course${courseId}`;
   const course = (prompt(
-    `已取到 ${rows.length} 节回放。\n\n清单名（= 课程名，决定 media\\ 下的文件夹名）：`,
+    `共 ${started.length} 节已开始，取到 ${rows.length} 节回放` +
+    (missing ? `（${missing} 节暂无回放，可能还没生成）` : '') +
+    `。\n\n清单名（= 课程名，决定 media\\ 下的文件夹名）：`,
     guess) || '').trim();
   if (!course) { alert('已取消'); return; }
 

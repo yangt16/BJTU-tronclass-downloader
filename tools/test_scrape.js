@@ -135,6 +135,7 @@ global.document = {
       p => lines.some(l => l.startsWith(p)))],
     ['不再询问轨道', !/confirm\(/.test(code)],
     ['有进度提示', progress.some(x => x.includes('/15 节')) || progress.some(x => x.includes('完成'))],
+    ['整理阶段提示总节数', progress.some(x => x.includes('已查 15 节'))],
     ['未开始的节没被下载', !lines.some(u => u.includes('270000') || u.includes('270001'))],
     ['有表头注释', comments.length > 0 && comments[0].startsWith('# 测试课程')],
   ];

@@ -49,8 +49,10 @@
 
 | 平台 | 文件 | 大小 | 拿到后 |
 |---|---|---|---|
-| Windows | `tronclass-downloader-v3.2-win64.zip` | 77.7 MB | 解压 → 双击 `0-首次安装.cmd`（ffmpeg 已内置，秒过） |
-| macOS / Linux | `tronclass-downloader-v3.2-mac.zip` | 0.08 MB | 先 `brew install ffmpeg python3`，再 `chmod +x *.command tools/*.sh && ./0-首次安装.command` |
+| Windows | `tronclass-downloader-<版本>-win64.zip` | 约 75 MB | 解压 → 双击 `0-首次安装.cmd`（ffmpeg 已内置，秒过） |
+| macOS / Linux | `tronclass-downloader-<版本>-mac.zip` | 约 0.1 MB | 先 `brew install ffmpeg python3`，再 `chmod +x *.command tools/*.sh && ./0-首次安装.command` |
+
+> 文件名里的版本号以 Releases 页为准，始终下载**最新版**。
 
 ### 方式 2：有 Git，一行命令（Windows）
 
@@ -97,7 +99,7 @@ D:\course-notes\lists\XX课程.txt
 ### 2. 双击开始下载
 
 Windows 双击 `1-开始下载.cmd`，macOS / Linux 双击 `1-开始下载.command`。
-会先问四个问题（**直接回车 = 默认**）：
+会先问四个问题（**直接回车 = 默认**），随后列出每门课规则和本次实际节数，输入 **y** 才开始：
 
 ```text
 产物：1) 视频 + 音频 [默认]   2) 只要音频   3) 只要视频
@@ -105,6 +107,7 @@ Windows 双击 `1-开始下载.cmd`，macOS / Linux 双击 `1-开始下载.comma
 并发：1 路 / 2 路 [默认] / 3 路 / 4 路
 单节加速：关闭 [默认] / 4 段 / 8 段（只补一两节时用）
 （菜单会记住上次选择，下次直接回车沿用；`python tools\menu.py --forget` 清除）
+（下载前会先列出每门课的规则和本次实际节数，输入 y 才开始；`--yes` 跳过）
 ```
 
 | 选择 | 产物 | 单节占用 |

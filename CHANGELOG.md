@@ -17,6 +17,8 @@
 - **本次下载报告**：`[报告] 新下载 N 节 · 录像 … MB + 音轨 … MB · 平均 … MB/s`
 - **并发路径自动化测试** `tools/test_concurrent.py`：本地服务器用 Barrier 证明
   真的 ≥3 并发，并验证字节一致、进度行、报告与二次运行跳过
+- **菜单记忆上次选择**：第二次起每问标 `[上次]`，回车即沿用；
+  `python tools\menu.py --forget` 恢复默认
 - **按课程配置下载规则**：新增 `2-清单规则.cmd` / `.command` 与 `tools\rules.py`
   （交互式或 `set/clear/list` 命令行），规则写进 `lists\<课程>.rules`
   （`only:` / `exclude:`，支持日期与星期几）；规则优先于菜单筛选，

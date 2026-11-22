@@ -97,6 +97,9 @@ lectures.FFMPEG = pathlib.Path(sys.executable)
 lectures.FFPROBE = pathlib.Path(sys.executable)
 lectures.check_media = lambda path, probe=None: (True, "打桩")
 lectures.notify_done = lambda: None
+# --keep-list 分支会调 make_index；打桩避免往真实 lists\ 写 out.md
+import make_index  # noqa: E402
+make_index.rebuild = lambda outdir: None
 
 
 def run_main():

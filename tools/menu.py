@@ -23,6 +23,65 @@ JOBS_CN = {"1": "1 路", "2": "2 路", "3": "3 路", "4": "4 路"}
 SEG_CN = {"1": "关闭", "4": "4 段", "8": "8 段"}
 # 菜单上显示的序号 -> 实际段数（1 关闭 / 2 四段 / 3 八段）
 SEG_MAP = {"1": "1", "2": "4", "3": "8"}
+SEG_INV = {v: k for k, v in SEG_MAP.items()}
+
+MEMORY_PATH = ROOT / ".menu.json"
+MEMORY_KEYS = ("mode", "scope", "value", "jobs", "seg")
+MEMORY_DEFAULT = {"mode": "1", "scope": "1", "value": "", "jobs": "2", "seg": "1"}
+
+
+def load_memory(path=None):
+    """读上次的选择（文件不存在/损坏时用默认值）。"""
+    path = pathlib.Path(path) if path else MEMORY_PATH
+    data = dict(MEMORY_DEFAULT)
+    try:
+        raw = __import__("json").loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return data
+    if isinstance(raw, dict):
+        for k in MEMORY_KEYS:
+            v = raw.get(k)
+            if isinstance(v, str):
+                data[k] = v
+    if data["mode"] not in MODE_CN:
+        data["mode"] = "1"
+    if data["scope"] not in SCOPE_CN:
+        data["scope"] = "1"
+    if data["jobs"] not in JOBS_CN:
+        data["jobs"] = "2"
+    if data["seg"] not in SEG_CN:
+        data["seg"] = "1"
+    return data
+
+
+def save_memory(choice, path=None):
+    """把本次选择写进记忆文件，下次作为默认值。"""
+    path = pathlib.Path(path) if path else MEMORY_PATH
+    try:
+        path.write_text(__import__("json").dumps(choice, ensure_ascii=False),
+                        encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def forget_memory(path=None):
+    """清除记忆（恢复默认）。"""
+    path = pathlib.Path(path) if path else MEMORY_PATH
+    try:
+        if path.exists():
+            path.unlink()
+        return True
+    except Exception:
+        return False
+
+
+def show_options(items, default):
+    """打印选项，并标出"上次"。"""
+    for key, label in items:
+        mark = "  [上次]" if key == default else ""
+        print(f"  {key}) {label}{mark}")
+
 SCOPE_CN = {"1": "下载全部", "2": "只下某一天", "3": "只下星期几", "4": "排除星期几"}
 
 # 菜单接管的变量：每次运行前清掉，避免上一次的残留影响本次
@@ -89,46 +148,53 @@ def choose(prompt, default, labels):
 
 def main():
     print("=" * 60)
-    print("[menu] 下载设置（直接回车 = 方括号里的默认值）")
+    print("[menu] 下载设置（直接回车 = 沿用记忆/默认值）")
     print("=" * 60)
 
+    mem = load_memory()
+    if mem != MEMORY_DEFAULT:
+        print(f"\n[记忆] 上次：{MODE_CN[mem['mode']]} / {SCOPE_CN[mem['scope']]}"
+              f" / {JOBS_CN[mem['jobs']]} / 单节加速 {SEG_CN[mem['seg']]}")
+
     print("\n产物：")
-    print("  1) 视频 + 音频  [1]")
-    print("  2) 只要音频")
-    print("  3) 只要视频")
-    mode = choose("> ", "1", MODE_CN)
+    show_options([(k, v) for k, v in MODE_CN.items()], mem["mode"])
+    mode = choose("> ", mem["mode"], MODE_CN)
 
     print("\n范围：")
-    print("  1) 下载全部      [1]")
-    print("  2) 只下某一天")
-    print("  3) 只下星期几")
-    print("  4) 排除星期几")
-    scope = choose("> ", "1", SCOPE_CN)
+    show_options([(k, v) for k, v in SCOPE_CN.items()], mem["scope"])
+    scope = choose("> ", mem["scope"], SCOPE_CN)
 
     print("\n并发下载（越多越快，但对服务器压力也越大）：")
-    print("  1) 1 路（最稳）")
-    print("  2) 2 路  [2]")
-    print("  3) 3 路")
-    print("  4) 4 路")
-    jobs = choose("> ", "2", JOBS_CN)
+    show_options([("1", JOBS_CN["1"]), ("2", JOBS_CN["2"]), ("3", JOBS_CN["3"])],
+                 mem["jobs"])
+    print("  4) 4 路" + ("  [上次]" if mem["jobs"] == "4" else ""))
+    jobs = choose("> ", mem["jobs"], JOBS_CN)
 
     print("\n单节加速（只补一两节时有用；多节并发时保持关闭）：")
-    print("  1) 关闭  [1]")
-    print("  2) 4 段")
-    print("  3) 8 段（实测比 4 段快约 2 倍）")
-    seg = SEG_MAP[choose("> ", "1", SEG_MAP)]
+    show_options([("1", "关闭"), ("2", "4 段")], SEG_INV[mem["seg"]])
+    print("  3) 8 段（实测比 4 段快约 2 倍）"
+          + ("  [上次]" if mem["seg"] == "8" else ""))
+    seg = SEG_MAP[choose("> ", SEG_INV[mem["seg"]], SEG_MAP)]
 
     value = ""
+    mem_value = mem["value"] if scope == mem["scope"] else ""
     if scope == "2":
         while not value:
-            value = parse_dates(ask("\n日期（8 位，如 20261030；多个用逗号）：")) or ""
+            hint = f"，回车沿用 {mem_value}" if mem_value else ""
+            value = parse_dates(
+                ask(f"\n日期（8 位，如 20261030；多个用逗号{hint}）：")) or mem_value
             if not value:
                 print("  !! 需要 8 位日期，如 20261030")
     elif scope in ("3", "4"):
         while not value:
-            value = parse_weekdays(ask("\n星期几（1=周一 … 7=周日；多个用逗号，如 2,4）：")) or ""
+            hint = f"，回车沿用 {mem_value}" if mem_value else ""
+            value = parse_weekdays(
+                ask(f"\n星期几（1=周一 … 7=周日；多个用逗号，如 2,4{hint}）：")) or mem_value
             if not value:
                 print("  !! 只能输入 1-7，如 4 或 2,4")
+
+    save_memory({"mode": mode, "scope": scope, "value": value,
+                 "jobs": jobs, "seg": seg})
 
     mode_cn, range_cn = describe(mode, scope, value)
     print("\n" + "=" * 60)
@@ -153,6 +219,12 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--forget" in sys.argv[1:]:
+        if forget_memory():
+            print("[记忆] 已清除，下次回到默认（视频+音频 / 全部 / 2 路 / 关闭）")
+        else:
+            print("[记忆] 清除失败")
+        sys.exit(0)
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:

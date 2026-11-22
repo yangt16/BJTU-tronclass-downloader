@@ -88,6 +88,26 @@ check("摘要 某天", menu.describe("3", "2", "20261030"), ("只要视频", "�
 check("并发文案表", menu.JOBS_CN, {"1": "1 路", "2": "2 路", "3": "3 路", "4": "4 路"})
 check("分段文案表", menu.SEG_CN, {"1": "关闭", "4": "4 段", "8": "8 段"})
 check("分段菜单序号映射", menu.SEG_MAP, {"1": "1", "2": "4", "3": "8"})
+check("分段反查映射", menu.SEG_INV, {"1": "1", "4": "2", "8": "3"})
+
+# ---------- 记忆持久化 ----------
+import pathlib as _pl
+import tempfile as _tf
+
+_mem = _pl.Path(_tf.mkdtemp()) / "mem.json"
+check("无记忆文件 -> 默认", menu.load_memory(_mem),
+      {"mode": "1", "scope": "1", "value": "", "jobs": "2", "seg": "1"})
+menu.save_memory({"mode": "2", "scope": "3", "value": "4",
+                  "jobs": "1", "seg": "4"}, _mem)
+check("保存后读回", menu.load_memory(_mem),
+      {"mode": "2", "scope": "3", "value": "4", "jobs": "1", "seg": "4"})
+_mem.write_text('{"mode": "9", "jobs": "x"}', encoding="utf-8")
+check("非法值回落默认", menu.load_memory(_mem),
+      {"mode": "1", "scope": "1", "value": "", "jobs": "2", "seg": "1"})
+_mem.write_text("not json", encoding="utf-8")
+check("坏文件回落默认", menu.load_memory(_mem)["mode"], "1")
+menu.forget_memory(_mem)
+check("forget 删除文件", _mem.exists(), False)
 
 print()
 print("全部通过" if bad == 0 else f"{bad} 项失败")

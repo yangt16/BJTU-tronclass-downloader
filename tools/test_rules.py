@@ -129,6 +129,21 @@ try:
     rule, _ = rules.load(LISTS / "AA.rules")
     check("交互式写规则", rule["only"], ["4"])
 
+    # ---------- 修改规则：5 返回不改 / 回车沿用 / 覆盖 ----------
+    rules.save(LISTS / "AA.rules", {"only": ["4"], "exclude": []})
+    run(stdin="1\n5\nq\n")           # 选 AA -> 5 返回 -> q
+    rule, _ = rules.load(LISTS / "AA.rules")
+    check("5 返回不修改规则", rule["only"], ["4"])
+
+    run(stdin="1\n2\n\nq\n")         # 选 AA -> 只下星期几 -> 空回车沿用 4
+    rule, _ = rules.load(LISTS / "AA.rules")
+    check("空回车沿用当前值", rule["only"], ["4"])
+
+    run(stdin="1\n3\n2\nq\n")        # 改成排除周二
+    rule, _ = rules.load(LISTS / "AA.rules")
+    check("重新选择即覆盖", (rule["only"], rule["exclude"]), ([], ["2"]))
+    rules.save(LISTS / "AA.rules", {"only": ["4"], "exclude": []})
+
     # ---------- 一次会话配两门，然后按 q 退出 ----------
     r = run(stdin="1\n2\n4\n2\n3\n2\nq\n")
     check("多课程会话退出码", r.returncode, 0)

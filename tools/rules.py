@@ -221,8 +221,43 @@ def _read(prompt=""):
         return None
 
 
+def _all_weekday(tokens):
+    return bool(tokens) and all(re.fullmatch(r"[1-7]", t) for t in tokens)
+
+
+def _all_date(tokens):
+    return bool(tokens) and all(re.fullmatch(r"\d{8}(_[\d\-]+)?", t) for t in tokens)
+
+
+def _ask_tokens(kind, current):
+    """问日期/星期几；回车沿用 current（如果类型匹配）。返回 tokens 或 None（退出）。"""
+    if kind == "weekday":
+        label = "星期几（1=周一 … 7=周日；多个用逗号，如 2,4）"
+        default = current if _all_weekday(current) else []
+        bad_hint = "  !! 只能输入 1-7，或 q 退出"
+    else:
+        label = "日期（8 位，如 20261030；多个用逗号）"
+        default = current if _all_date(current) else []
+        bad_hint = "  !! 要 8 位日期，如 20261030，或 q 退出"
+    if default:
+        print(f"\n{label}（当前 {','.join(default)}，回车沿用）:")
+    else:
+        print(f"\n{label}:")
+    while True:
+        raw = _read("> ")
+        if raw is None or raw.strip().lower() in ("q", "quit", "exit"):
+            print("\n[规则] 已退出")
+            return None
+        if not raw.strip() and default:
+            return list(default)
+        tokens, bad = normalize_tokens(raw)
+        if tokens and not bad:
+            return tokens
+        print(bad_hint)
+
+
 def interactive(lists_dir, media_dir=None):
-    """交互式配置：配完后回到课程列表，输入 q 退出。"""
+    """交互式配置：配完回到课程列表；可重复配置（覆盖=修改）；输入 q 退出。"""
     while True:
         items = discover(lists_dir, media_dir)
         print("=" * 60)
@@ -239,85 +274,59 @@ def interactive(lists_dir, media_dir=None):
         txt = None
         while txt is None:
             raw = _read("> ")
-            if raw is None:
+            if raw is None or raw.strip().lower() in ("q", "quit", "exit"):
                 print("\n[规则] 已退出")
                 return 0
             s = raw.strip()
-            if s.lower() in ("q", "quit", "exit"):
-                print("\n[规则] 已退出")
-                return 0
             if not (s.isdigit() and 1 <= int(s) <= manual):
                 print(f"  !! 请输入 1-{manual}，或 q 退出")
                 continue
             if int(s) == manual:
                 name = _read("课程名（= 清单文件名，不带 .txt）: ")
-                if name is None:
-                    print("\n[规则] 已退出")
-                    return 0
-                name = pathlib.Path(name.strip()).stem
-                if not name:
+                if name is None or not name.strip():
                     print("  !! 课程名不能为空")
                     continue
-                txt = pathlib.Path(lists_dir) / f"{name}.txt"
+                txt = pathlib.Path(lists_dir) / f"{pathlib.Path(name.strip()).stem}.txt"
             else:
                 it = items[int(s) - 1]
                 txt = it["txt"] if it["txt"] else pathlib.Path(lists_dir) / f"{it['name']}.txt"
 
-        print(f"\n给 {txt.stem} 设置规则:")
+        current, cur_errors = load(rules_path_for(txt))
+        if cur_errors:
+            print(f"（当前规则有误：{', '.join(cur_errors)}）")
+        print(f"\n给 {txt.stem} 设置规则（当前：{describe(current)}）:")
         print("  1) 全部下载（删除规则）")
         print("  2) 只下星期几")
         print("  3) 排除星期几")
         print("  4) 只下某几天（输入日期）")
+        print("  5) 返回课程列表（不改）")
         choice = None
-        while choice not in ("1", "2", "3", "4"):
+        while choice not in ("1", "2", "3", "4", "5"):
             raw = _read("> ")
-            if raw is None:
+            if raw is None or raw.strip().lower() in ("q", "quit", "exit"):
                 print("\n[规则] 已退出")
                 return 0
             choice = raw.strip()
-            if choice.lower() in ("q", "quit", "exit"):
-                print("\n[规则] 已退出")
-                return 0
-            if choice not in ("1", "2", "3", "4"):
-                print("  !! 请输入 1-4，或 q 退出")
+            if choice not in ("1", "2", "3", "4", "5"):
+                print("  !! 请输入 1-5，或 q 退出")
+        if choice == "5":
+            print()
+            continue
 
         only, exclude = [], []
-        if choice == "1":
-            pass
-        elif choice in ("2", "3"):
-            print("\n星期几（1=周一 … 7=周日；多个用逗号，如 2,4）:")
-            tokens = []
-            while not tokens:
-                raw = _read("> ")
-                if raw is None:
-                    print("\n[规则] 已退出")
-                    return 0
-                if raw.strip().lower() in ("q", "quit", "exit"):
-                    print("\n[规则] 已退出")
-                    return 0
-                tokens, bad = normalize_tokens(raw)
-                if bad or not tokens:
-                    print("  !! 只能输入 1-7，或 q 退出")
-                    tokens = []
+        if choice in ("2", "3"):
+            tokens = _ask_tokens("weekday",
+                                 current["only"] if choice == "2" else current["exclude"])
+            if tokens is None:
+                return 0
             if choice == "2":
                 only = tokens
             else:
                 exclude = tokens
-        else:
-            print("\n日期（8 位，如 20261030；多个用逗号）:")
-            tokens = []
-            while not tokens:
-                raw = _read("> ")
-                if raw is None:
-                    print("\n[规则] 已退出")
-                    return 0
-                if raw.strip().lower() in ("q", "quit", "exit"):
-                    print("\n[规则] 已退出")
-                    return 0
-                tokens, bad = normalize_tokens(raw)
-                if bad or not tokens:
-                    print("  !! 要 8 位日期，如 20261030，或 q 退出")
-                    tokens = []
+        elif choice == "4":
+            tokens = _ask_tokens("date", current["only"])
+            if tokens is None:
+                return 0
             only = tokens
 
         path = rules_path_for(txt)

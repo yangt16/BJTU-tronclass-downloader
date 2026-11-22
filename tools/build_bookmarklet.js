@@ -32,8 +32,8 @@ fs.writeFileSync(path.join(DIST, 'bookmarklet.txt'), url + '\n', 'utf8');
 // 这是 Netscape 书签格式，Chrome / Edge / Safari 都认。
 const bookmarksHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
-<TITLE>Bookmarks</TITLE>
-<H1>Bookmarks</H1>
+<TITLE>课程回放下载器</TITLE>
+<H1>课程回放下载器</H1>
 <DL><p>
     <DT><A HREF="${url}" ADD_DATE="${Math.floor(Date.now()/1000)}">抓取课程清单</A>
 </DL><p>
@@ -74,7 +74,7 @@ const html = `<!doctype html>
   <b>怎么用：</b><br>
   1. 打开某门课的「直播」列表页（地址里有 <code>/course/数字/live-activities</code>）<br>
   2. 点一下书签栏里的「抓取课程清单」<br>
-  3. 按弹框提示填课程名、选是否导出三条轨（选取消 = 只导 ENCODER）<br>
+  3. 按提示填课程名（三条轨都会导出，下载时只解析要用的轨）<br>
   4. 浏览器会下载 <code>&lt;课程名&gt;.txt</code><br>
   5. 双击课程下载器的 <code>1-开始下载.cmd</code>，按菜单选产物、范围、并发和单节加速；
   确认规则和本次节数后按 <code>y</code> 开始<br>

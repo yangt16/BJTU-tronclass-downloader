@@ -79,15 +79,28 @@ global.Blob = class {
   constructor(parts) { blobParts.push(parts.join('')); }
 };
 global.URL = { createObjectURL: () => 'blob:fake' };
+const progress = [];
 global.document = {
   body: { appendChild() {} },
-  createElement: () => ({
-    set href(v) {}, get href() { return ''; },
-    set download(v) { downloadedName = v; },
-    get download() { return downloadedName; },
-    click() { downloadedText = blobParts[blobParts.length - 1]; },
-    remove() {},
-  }),
+  createElement: (tag) => {
+    if (tag === 'a') {
+      return {
+        set href(v) {}, get href() { return ''; },
+        set download(v) { downloadedName = v; },
+        get download() { return downloadedName; },
+        click() { downloadedText = blobParts[blobParts.length - 1]; },
+        remove() {},
+      };
+    }
+    let text = '';
+    return {
+      style: {},
+      get textContent() { return text; },
+      set textContent(v) { text = v; progress.push(v); },
+      appendChild() {},
+      remove() {},
+    };
+  },
 };
 
 (async () => {
@@ -116,9 +129,12 @@ global.document = {
     ['列表接口调用 1 次', listCalls.length === 1],
     ['只查了已开始的 15 节', detailCalls.length === 15],
     ['文件名是 测试课程.txt', downloadedName === '测试课程.txt'],
-    ['清单里 15 条地址', lines.length === 15],
+    ['清单里 45 条地址（15 节 x 3 轨）', lines.length === 45],
     ['每行都是 TRACK URL', lines.every(l => /^[A-Z]+ https?:\/\//.test(l))],
-    ['只导了 ENCODER', lines.length > 0 && lines.every(u => u.startsWith('ENCODER ') && u.includes('previewToken=enc'))],
+    ['三条轨都导出', ['ENCODER ', 'STUDENTS ', 'INSTRUCTOR '].every(
+      p => lines.some(l => l.startsWith(p)))],
+    ['不再询问轨道', !/confirm\(/.test(code)],
+    ['有进度提示', progress.some(x => x.includes('/15 节')) || progress.some(x => x.includes('完成'))],
     ['未开始的节没被下载', !lines.some(u => u.includes('270000') || u.includes('270001'))],
     ['有表头注释', comments.length > 0 && comments[0].startsWith('# 测试课程')],
   ];

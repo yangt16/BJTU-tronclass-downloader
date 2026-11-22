@@ -1,5 +1,7 @@
 /**
- * scrape_course.js (v2) - 在课程「直播」页上运行，导出整门课的回放清单。
+ * scrape_course.js (v3) - 在课程「直播」页上运行，导出整门课的回放清单。
+ *
+ * v3：每节详情并发 6 路（右下角显示进度）；三条轨固定全部导出（不再询问）。
  *
  * 纯走接口，不依赖 DOM，不受分页影响。已实测的接口形状：
  *
@@ -34,6 +36,30 @@
   const courseId = m[1];
   console.log(`[scrape] courseId=${courseId}`);
 
+  // 页面右下角进度提示（抓取时不再像卡死）
+  const ui = (() => {
+    let el = null;
+    const box = () => {
+      if (el) return el;
+      el = document.createElement('div');
+      el.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2147483647;' +
+        'background:#1f2430;color:#fff;padding:10px 14px;border-radius:8px;' +
+        'font:13px/1.5 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.35);' +
+        'max-width:320px;white-space:pre-wrap';
+      el.textContent = '';
+      document.body.appendChild(el);
+      return el;
+    };
+    return {
+      set(text) { box().textContent = text; },
+      done(text, ms) {
+        box().textContent = text;
+        setTimeout(() => { if (el) { el.remove(); el = null; } }, ms || 4000);
+      },
+    };
+  })();
+  ui.set('抓取中：正在拉活动列表…');
+
   // ---------- 1. 拉列表（自动翻页） ----------
   const PAGE = 100;                 // 先试一次拉完；服务端若限流，pages 会告诉我们
   const types = 'types[]=lecture_live&types[]=third_party_live';
@@ -52,6 +78,7 @@
     page++;
   } while (page <= pages && page <= 50);
 
+  ui.set(`列表已取 ${all.length} 条，正在取每节回放…`);
   const live = all.filter(it => it.type === 'lecture_live');
   if (!live.length) { alert('这门课没有 lecture_live 类型的活动'); return; }
   console.log(`[scrape] lecture_live 共 ${live.length} 条`);
@@ -66,27 +93,41 @@
   });
   console.log(`[scrape] 需要查详情的 ${started.length} 条`);
 
-  // ---------- 2. 逐节取回放轨 ----------
-  const rows = [];
-  for (const it of started) {
+  // ---------- 2. 并发取回放轨（一次 6 节，进度显示在右下角）----------
+  const CONC = 6;
+  const raw = new Array(started.length).fill(null);
+  let fetched = 0;
+  const queue = started.map((it, i) => [it, i]);
+  async function one(it) {
     try {
       const r = await fetch(`/api/activities/${it.id}`, { credentials: 'include' });
-      if (!r.ok) { console.warn(`[scrape] ${it.id} HTTP ${r.status}`); continue; }
+      if (!r.ok) { console.warn(`[scrape] ${it.id} HTTP ${r.status}`); return null; }
       const j = await r.json();
       const det = (j.data && j.data.external_live_detail) || {};
       const vids = det.replay_videos || [];
-      if (!vids.length) { console.warn(`[scrape] ${it.id} 无回放（可能还没下课）`); continue; }
-      rows.push({
+      if (!vids.length) { console.warn(`[scrape] ${it.id} 无回放（可能还没下课）`); return null; }
+      console.log(`[scrape] ${it.id} ${it.start_time} -> ${vids.length} 条轨`);
+      return {
         id: it.id,
         title: j.title || it.title || '',
         date: (it.start_time || '').slice(0, 10),
         videos: vids,
-      });
-      console.log(`[scrape] ${it.id} ${it.start_time} -> ${vids.length} 条轨`);
+      };
     } catch (e) {
       console.warn(`[scrape] ${it.id} 失败:`, e);
+      return null;
     }
   }
+  async function worker() {
+    while (queue.length) {
+      const [it, idx] = queue.shift();
+      raw[idx] = await one(it);
+      fetched++;
+      ui.set(`抓取中：${fetched}/${started.length} 节`);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONC, started.length) }, worker));
+  const rows = raw.filter(Boolean);
   if (!rows.length) { alert('一条回放都没取到（这门课可能还没出回放）'); return; }
 
   // ---------- 3. 课程名：从活动标题里去掉日期前缀 ----------
@@ -96,10 +137,7 @@
     guess) || '').trim();
   if (!course) { alert('已取消'); return; }
 
-  const allTracks = confirm(
-    `确定 = 只导出 ENCODER（推荐，每节 0.5-1.4 GB）\n` +
-    `取消 = 三条轨全导出（每节约 4.4 GB）`
-  );
+  // 三条轨固定全部导出：本地程序按需解析，不会全下
 
   // ---------- 4. 生成清单 ----------
   const lines = [
@@ -108,9 +146,7 @@
   ];
   for (const r of rows) {
     lines.push(`# ${r.date} ${r.title}`);
-    const pick = allTracks ? r.videos : r.videos.filter(v => v.camera_type === 'encoder');
-    if (!pick.length) { lines.push(`# (无 encoder 轨，已跳过)`); continue; }
-    for (const v of pick) {
+    for (const v of r.videos) {
       const tr = (v.camera_type || '').toUpperCase();
       lines.push(tr ? `${tr} ${v.url}` : v.url);
     }
@@ -125,5 +161,6 @@
   a.remove();
 
   console.log(`[scrape] 完成：${rows.length} 节 -> ${course}.txt`);
+  ui.done(`完成：${rows.length} 节，已下载 ${course}.txt`);
   alert(`已导出 ${rows.length} 节到「下载」文件夹的 ${course}.txt\n\n把下载的 txt 放进 lists\\，或直接拖到入口图标上。\\n跑完后 txt 会自动归档，lists 里不会留下 txt。`);
 })();

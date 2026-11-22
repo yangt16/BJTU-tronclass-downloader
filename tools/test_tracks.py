@@ -92,11 +92,43 @@ try:
           ["ENCODER", "STUDENTS", "INSTRUCTOR", "STUDENTS", "INSTRUCTOR"])
 
     # ---------- 2) 只解析要用的轨 ----------
-    lectures.resolve_entries(entries)
+    CACHE = BASE / "resolve-cache.json"
+    lectures.resolve_entries(entries, cache_path=CACHE)
     check("只发了 2 次解析请求", len(hits), 2)
     check("两次解析是并发的", parallel["ok"], True)
     check("ENCODER 优先被解析",
           any(t.endswith("_ENCODER") for t in hits), True)
+
+    # ---------- 2b) 缓存命中：第二次零请求 ----------
+    cache = lectures.load_resolve_cache(CACHE)
+    check("缓存写入 2 节", len(cache), 2)
+    entries2 = lectures.load_urls(LST)
+    before = len(hits)
+    lectures.resolve_entries(entries2, cache_path=CACHE)
+    check("缓存命中不发请求", len(hits), before)
+    labels2 = {e["label"] for e in entries2}
+    check("缓存命中也有标签", labels2,
+          {"20261029_080000-095500", "20261105_100000-120000"})
+    bad_cache = BASE / "bad-cache.json"
+    bad_cache.write_text('{"h1": "not-a-label", "h2": 123}', encoding="utf-8")
+    check("坏缓存行被忽略", lectures.load_resolve_cache(bad_cache), {})
+
+    # 缓存命中后：已下载的节离线跳过（零请求）
+    out2 = BASE / "out2"
+    for d in ("20261029", "20261105"):
+        (out2 / d).mkdir(parents=True)
+    for f in ("out2_20261029.mp4", "out2_20261105.mp4"):
+        d = f.split("_")[1].split(".")[0]
+        (out2 / d / f).write_bytes(b"x")
+    groups2 = lectures.group_by_label(entries2)
+    before = len(hits)
+    todo2, skipped2, _ = lectures.plan_sections(
+        groups2, out2, "video", "ENCODER")
+    check("已下载的节直接跳过", (len(todo2), len(skipped2)), (0, 2))
+    check("跳过过程零解析请求", len(hits), before)
+    # 真要下时才解析一条新鲜直链
+    lectures.ensure_real(entries2[0])
+    check("下载前才解析直链", len(hits), before + 1)
     groups = lectures.group_by_label(entries)
     check("分成 2 节", sorted(groups), ["20261029_080000-095500",
                                         "20261105_100000-120000"])
@@ -125,7 +157,7 @@ try:
         encoding="utf-8")
     old_entries = lectures.load_urls(OLD)
     check("旧格式也能读", len(old_entries), 3)
-    lectures.resolve_entries(old_entries)
+    lectures.resolve_entries(old_entries, cache_path=BASE / "old-cache.json")
     check("旧格式也只解析 1 次", len(hits), 1)
     old_groups = lectures.group_by_label(old_entries)
     check("旧格式分组正常", len(old_groups), 1)

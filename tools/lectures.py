@@ -38,6 +38,10 @@ except Exception:
 # ROOT = tools/ 的父目录。整套东西可搬到任意位置而不用改代码。
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+# 解析缓存：capture hash -> 日期_时段。只缓存稳定信息，不缓存签名直链。
+RESOLVE_CACHE = ROOT / "lists" / "resolve-cache.json"
+LABEL_RE = re.compile(r"^\d{8}_\d{6}-\d{6}$")
+
 
 class _Tee:
     """把输出同时写到控制台和日志文件。"""
@@ -282,39 +286,87 @@ def ensure_real(e):
     return real
 
 
-def resolve_entries(entries, workers=8):
-    """只解析要用的轨：同一节课（capture hash）只解析 ENCODER（没有就第一条）。
+def load_resolve_cache(path=None):
+    """读取解析缓存（hash -> 日期_时段）；坏文件/坏行自动忽略。"""
+    path = pathlib.Path(path) if path else RESOLVE_CACHE
+    try:
+        data = __import__("json").loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items()
+            if isinstance(k, str) and isinstance(v, str) and LABEL_RE.match(v)}
 
-    54 条三轨清单 -> 只发 18 次 302；其余轨等到真要下时才解析。
+
+def save_resolve_cache(cache, path=None):
+    path = pathlib.Path(path) if path else RESOLVE_CACHE
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            __import__("json").dumps(cache, ensure_ascii=False, indent=0),
+            encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def resolve_entries(entries, workers=8, cache_path=None):
+    """只解析"这次真正需要"的节。
+
+    - 同一节课（capture hash）只解析 ENCODER（没有就第一条），其余轨用到才解析
+    - lists\\resolve-cache.json 命中 -> 直接拿到日期/时段，零请求
+      （每周重抓整门课时，只有新节需要解析）
+    - 缓存没有的节才 302；并行 8 路
+    直链签名有时效，所以缓存只存日期/时段，下载前再解析拿新鲜直链。
     """
+    cache = load_resolve_cache(cache_path)
     by_hash, loose = {}, []
-    for i, e in enumerate(entries):
+    for e in entries:
         h = hash_of(e["url"])
         if h:
             by_hash.setdefault(h, []).append(e)
         else:
             loose.append(e)
-    picks = []
-    for es in by_hash.values():
+
+    hits = 0
+    for h, es in by_hash.items():
+        lab = cache.get(h)
+        if not lab:
+            continue
+        hits += 1
+        for e in es:
+            if not e.get("label"):
+                e["label"] = lab
+
+    pending = []
+    for h, es in by_hash.items():
+        if any(e.get("label") for e in es):
+            continue
         enc = [e for e in es if entry_track(e) == "ENCODER"]
-        picks.append(enc[0] if enc else es[0])
-    picks.extend(loose)
-    print(f"[resolve] 清单 {len(entries)} 条（约 {len(by_hash) + len(loose)} 节），"
-          f"只解析要用的 {len(picks)} 条 ...")
-    from concurrent.futures import ThreadPoolExecutor
+        pending.append((h, enc[0] if enc else es[0]))
+    pending.extend(("", e) for e in loose)
 
-    def work(e):
-        try:
-            real = resolve(e["url"])
-        except Exception as ex:
-            print(f"  ! 解析失败: {e['url'][-40:]}  {ex}")
-            return
-        e["real"] = real
-        e["label"] = label_of(real)
-        print(f"  {e['url'][-42:]}  ->  {real[-46:]}")
+    print(f"[resolve] 清单 {len(entries)} 条（约 {len(by_hash) + len(loose)} 节）："
+          f"缓存命中 {hits} 节，需要解析 {len(pending)} 节 ...")
 
-    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(picks)))) as pool:
-        list(pool.map(work, picks))
+    if pending:
+        def work(item):
+            h, e = item
+            try:
+                real = resolve(e["url"])
+            except Exception as ex:
+                print(f"  ! 解析失败: {e['url'][-40:]}  {ex}")
+                return
+            e["real"] = real
+            e["label"] = label_of(real)
+            if h and LABEL_RE.match(e["label"]):
+                cache[h] = e["label"]
+            print(f"  {e['url'][-42:]}  ->  {real[-46:]}")
+
+        with ThreadPoolExecutor(
+                max_workers=max(1, min(workers, len(pending)))) as pool:
+            list(pool.map(work, pending))
 
     # 同一节课的其它轨共享标签
     for es in by_hash.values():
@@ -323,7 +375,7 @@ def resolve_entries(entries, workers=8):
             for e in es:
                 e["label"] = e.get("label") or labels[0]
     # 整节都没解析出来 -> 逐条兜底
-    for es in by_hash.values():
+    for h, es in by_hash.items():
         if any(e.get("label") for e in es):
             continue
         print(f"  ! 这一节没解析出来，逐条重试: {es[0]['url'][-40:]}")
@@ -333,8 +385,13 @@ def resolve_entries(entries, workers=8):
             except Exception as ex:
                 print(f"    ! {ex}")
         labels = [e["label"] for e in es if e.get("label")]
+        if labels and h and LABEL_RE.match(labels[0]):
+            cache[h] = labels[0]
         for e in es:
             e["label"] = e.get("label") or (labels[0] if labels else "lecture")
+
+    if pending:
+        save_resolve_cache(cache, cache_path)
 
 
 def labels_parts(label):
@@ -741,6 +798,11 @@ def main():
     print(f"[dest] 落点: {outdir}")
     if log_fh:
         print(f"[log] 同时写入 {log_fh.name}")
+
+    if not pathlib.Path(a.urls).exists():
+        print(f"[error] 找不到清单: {a.urls}")
+        print("       确认文件在 lists\\ 里；跑完的清单会归档到 har_archive\\")
+        return 2
 
     entries = load_urls(a.urls)
     if not entries:

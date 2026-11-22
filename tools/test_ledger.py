@@ -173,7 +173,7 @@ try:
     lectures.FFPROBE = pathlib.Path(sys.executable)
     old_argv = sys.argv
     sys.argv = ["lectures.py", "--urls", str(lst), "--dest",
-                str(BASE / "media" / "TC"), "--jobs", "1"]
+                str(BASE / "media" / "TC"), "--jobs", "1", "--keep-list"]
     buf = io.StringIO()
     try:
         with contextlib.redirect_stdout(buf):

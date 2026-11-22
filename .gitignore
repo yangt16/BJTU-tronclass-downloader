@@ -15,6 +15,7 @@ lists/*.md
 lists/*.rules
 lists/*.off
 lists/downloaded.jsonl
+lists/resolve-cache.json
 .menu.json
 __pycache__/
 *.pyc

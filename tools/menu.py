@@ -17,6 +17,7 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+LISTS = ROOT / "lists"
 WEEK_CN = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日"}
 MODE_CN = {"1": "视频 + 音频", "2": "只要音频", "3": "只要视频"}
 JOBS_CN = {"1": "1 路", "2": "2 路", "3": "3 路", "4": "4 路"}
@@ -138,6 +139,29 @@ def ask(prompt):
         return ""
 
 
+def rule_summary(lists_dir=None):
+    """扫描 lists 下各课程清单对应的规则。
+
+    返回 {"rows": [(课程, 描述, 有范围规则, 有产物规则)],
+          "has_rule": bool, "all_scope": bool, "all_mode": bool}
+    """
+    import rules as rules_mod
+    lists_dir = pathlib.Path(lists_dir) if lists_dir else LISTS
+    rows = []
+    for txt in sorted(lists_dir.glob("*.txt")):
+        rule, _errors = rules_mod.load(rules_mod.rules_path_for(txt))
+        has_scope = bool(rule.get("only") or rule.get("exclude"))
+        has_mode = bool(rule.get("mode"))
+        desc = rules_mod.describe(rule) if (has_scope or has_mode) else ""
+        rows.append((txt.stem, desc, has_scope, has_mode))
+    return {
+        "rows": rows,
+        "has_rule": any(r[1] for r in rows),
+        "all_scope": bool(rows) and all(r[2] for r in rows),
+        "all_mode": bool(rows) and all(r[3] for r in rows),
+    }
+
+
 def choose(prompt, default, labels):
     while True:
         s = ask(prompt) or default
@@ -151,18 +175,42 @@ def main():
     print("[menu] 下载设置（直接回车 = 沿用记忆/默认值）")
     print("=" * 60)
 
+    info = rule_summary()
+    if info["has_rule"]:
+        print("\n[规则] 检测到课程规则：")
+        for name, desc, _scope, _mode in info["rows"]:
+            if desc:
+                print(f"  {name}: {desc}")
+        no_rule = [r[0] for r in info["rows"] if not r[1]]
+        if no_rule:
+            print(f"  无规则：{', '.join(no_rule)}")
+
     mem = load_memory()
     if mem != MEMORY_DEFAULT:
         print(f"\n[记忆] 上次：{MODE_CN[mem['mode']]} / {SCOPE_CN[mem['scope']]}"
               f" / {JOBS_CN[mem['jobs']]} / 单节加速 {SEG_CN[mem['seg']]}")
 
-    print("\n产物：")
-    show_options([(k, v) for k, v in MODE_CN.items()], mem["mode"])
-    mode = choose("> ", mem["mode"], MODE_CN)
+    some_mode_rule = any(r[3] for r in info["rows"])
+    if info["all_mode"]:
+        print("\n产物：全部按课程规则（跳过询问）")
+        mode = "1"
+    else:
+        print("\n产物：")
+        show_options([(k, v) for k, v in MODE_CN.items()], mem["mode"])
+        if some_mode_rule:
+            print("  （有产物规则的课程按 .rules 跑，这里只影响没有规则的课程）")
+        mode = choose("> ", mem["mode"], MODE_CN)
 
-    print("\n范围：")
-    show_options([(k, v) for k, v in SCOPE_CN.items()], mem["scope"])
-    scope = choose("> ", mem["scope"], SCOPE_CN)
+    some_scope_rule = any(r[2] for r in info["rows"])
+    if info["all_scope"]:
+        print("\n范围：全部按课程规则（跳过询问）")
+        scope = "1"
+    else:
+        print("\n范围：")
+        show_options([(k, v) for k, v in SCOPE_CN.items()], mem["scope"])
+        if some_scope_rule:
+            print("  （有范围规则的课程按 .rules 跑，这里只影响没有规则的课程）")
+        scope = choose("> ", mem["scope"], SCOPE_CN)
 
     print("\n并发下载（越多越快，但对服务器压力也越大）：")
     show_options([("1", JOBS_CN["1"]), ("2", JOBS_CN["2"]), ("3", JOBS_CN["3"])],
@@ -193,10 +241,18 @@ def main():
             if not value:
                 print("  !! 只能输入 1-7，如 4 或 2,4")
 
-    save_memory({"mode": mode, "scope": scope, "value": value,
-                 "jobs": jobs, "seg": seg})
+    save_memory({
+        "mode": mem["mode"] if info["all_mode"] else mode,
+        "scope": mem["scope"] if info["all_scope"] else scope,
+        "value": mem["value"] if info["all_scope"] else value,
+        "jobs": jobs, "seg": seg,
+    })
 
     mode_cn, range_cn = describe(mode, scope, value)
+    if info["all_mode"]:
+        mode_cn = "按课程规则"
+    if info["all_scope"]:
+        range_cn = "按课程规则"
     print("\n" + "=" * 60)
     print(f"  产物：{mode_cn}")
     print(f"  范围：{range_cn}")

@@ -90,11 +90,41 @@ check("分段文案表", menu.SEG_CN, {"1": "关闭", "4": "4 段", "8": "8 段"
 check("分段菜单序号映射", menu.SEG_MAP, {"1": "1", "2": "4", "3": "8"})
 check("分段反查映射", menu.SEG_INV, {"1": "1", "4": "2", "8": "3"})
 
+# ---------- 规则摘要（有规则时跳过提问）----------
+import os as _os
+import pathlib as _pl
+import shutil as _sh
+
+_tmp = _pl.Path(menu.ROOT) / "tmp" / f"testmenu_rules_{_os.getpid()}"
+_sh.rmtree(_tmp, ignore_errors=True)
+_tmp.mkdir(parents=True)
+(_tmp / "A课.txt").write_text("http://x/1\n", encoding="utf-8")
+(_tmp / "B课.txt").write_text("http://x/2\n", encoding="utf-8")
+info = menu.rule_summary(_tmp)
+check("无规则 -> has_rule False", info["has_rule"], False)
+check("无规则 -> 不跳过范围", info["all_scope"], False)
+
+import rules as _rules
+_rules.save(_tmp / "A课.rules", {"only": ["4"], "exclude": [], "mode": "audio"})
+info = menu.rule_summary(_tmp)
+check("部分规则 -> has_rule True", info["has_rule"], True)
+check("部分规则 -> 不能跳过范围", info["all_scope"], False)
+
+_rules.save(_tmp / "B课.rules", {"only": ["2"], "exclude": [], "mode": ""})
+info = menu.rule_summary(_tmp)
+check("全部有范围规则 -> all_scope", info["all_scope"], True)
+check("不是全部有产物规则 -> all_mode False", info["all_mode"], False)
+check("规则描述", [r[1] for r in info["rows"] if r[0] == "A课"][0],
+      "产物 只要音频；只要 周四")
+_sh.rmtree(_tmp, ignore_errors=True)
+
 # ---------- 记忆持久化 ----------
 import pathlib as _pl
-import tempfile as _tf
 
-_mem = _pl.Path(_tf.mkdtemp()) / "mem.json"
+_mem_dir = _pl.Path(menu.ROOT) / "tmp" / f"testmenu_mem_{_os.getpid()}"
+_sh.rmtree(_mem_dir, ignore_errors=True)
+_mem_dir.mkdir(parents=True)
+_mem = _mem_dir / "mem.json"
 check("无记忆文件 -> 默认", menu.load_memory(_mem),
       {"mode": "1", "scope": "1", "value": "", "jobs": "2", "seg": "1"})
 menu.save_memory({"mode": "2", "scope": "3", "value": "4",
@@ -108,6 +138,7 @@ _mem.write_text("not json", encoding="utf-8")
 check("坏文件回落默认", menu.load_memory(_mem)["mode"], "1")
 menu.forget_memory(_mem)
 check("forget 删除文件", _mem.exists(), False)
+_sh.rmtree(_mem_dir, ignore_errors=True)
 
 print()
 print("全部通过" if bad == 0 else f"{bad} 项失败")

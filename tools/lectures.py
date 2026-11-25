@@ -834,11 +834,6 @@ def main():
         if not groups:
             print("[filter] 没有符合条件的节。检查日期（20261030）或星期几（1-7）是否写对")
             return 0
-        # 筛选模式下绝不归档清单：否则会把没处理的那些地址一起搬走
-        if not a.keep_list:
-            a.keep_list = True
-            print("[filter] 已自动开启 --keep-list（筛选时不归档清单）")
-
     # 三种模式：都要 / 只要音轨 / 只要视频
     mode = "video" if a.no_audio else ("audio" if a.drop_video else "both")
     mode, mode_source = rules.resolve_mode(mode, rule)

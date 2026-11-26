@@ -4,6 +4,8 @@ release/
 bin/
 python/
 /*.exe
+# 安装包试验目录（装出来自带 bin\ + python\，约 340 MB）
+/测试/
 
 # ---- 敏感：带 ts/token 签名的地址，等于会话凭据 ----
 har_archive/

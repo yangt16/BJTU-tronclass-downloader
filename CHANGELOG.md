@@ -4,6 +4,31 @@
 
 ---
 
+## v4.4 — 2026-11-26
+
+> 内容上跟 v4.3 一样能用；这一版主要是把「安装包怎么打」这件事搬进仓库，顺手修掉几个只在
+> 装完以后才看得见的问题。第一个真正发出来的 v4.x 版本也是它（v4.1–v4.3 只有 tag、没有 Release）。
+
+### 新增
+- **安装器源码入库**：`installer/app.iss` + `installer/app.ico` + `tools\build_installer.py`
+  * 以前打安装包靠本机手工文件（`release\installer-src\`，且 `OutputDir` 写死 `D:\course-notes\...`，
+    `release\` 又整个被 gitignore，clone 下来根本打不了包）
+  * 现在一条命令：`python tools\build_installer.py`。它会准备 win64 zip、解 Python 3.11 嵌入版、
+    **先用嵌入 Python 冒烟跑一遍 `menu.py`**（这里坏 = 装完双击闪退），再生成包装 iss 调 ISCC
+  * 产物固定为 `课程回放下载器-安装包.exe`，方便用固定链接下载
+- `docs\交接说明.md`：维护者交接（两套目录分工、发布流程、已知坑）
+
+### 修复
+- **快捷方式图标**：桌面/开始菜单改用项目自己的 `app.ico`。仓库里的 `.iss` 一直写着
+  `IconFilename: {sys}\cmd.exe`，谁用源码重打谁就会退回"命令提示符"图标
+- `docs\使用说明.md` 书签编译那段断行（`node tools\build_bookmarklet.js` 被截成 `ode ...`）
+- `test_shell` 的 git 执行位检查其实没生效（中文路径被转义 + 断言写法错 → 恒 PASS）。
+  现在 Windows 本地就能提前发现 `.command` 丢执行位，不用等 mac/Linux CI
+- `test_menu` 的隔离用例自带假 ffmpeg/ffprobe：Linux runner 没有 ffmpeg，用例会真的
+  启动引擎并失败（mac/Windows runner 碰巧有，所以只有 Linux 红）
+
+---
+
 ## v4.3 — 2026-11-26
 
 ### 新增

@@ -200,6 +200,9 @@ def main(argv=None):
     ver = normalize_version(version_of(a.version))
     full = full_version(ver)
     print(f"[installer] 版本 {ver}（{full}）")
+    if not re.fullmatch(r"v\d+(?:\.\d+)*", ver):
+        print("[installer] 注意：这不是 tag（git describe 带了 -N-gxxxx 后缀）。")
+        print("[installer]       正式发版先 git tag 再打，否则安装包版本和 Release 附件名对不上。")
 
     zip_path = win_zip(ver)
     prepare_stage(zip_path, embed_zip(a.python_zip))

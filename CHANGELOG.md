@@ -4,6 +4,18 @@
 
 ---
 
+## v4.3 — 2026-11-26
+
+### 新增
+- **一键更新**：`3-更新版本.cmd` / `.command` + `tools\update.py`
+  * 自动查 `releases/latest`（不走 API、不受限流），下载对应平台 zip
+  * 覆盖程序文件，但 `media\ lists\ har_archive\ logs\ python\ .menu.json` 一律保留
+  * 先直连/环境代理，失败自动再试 `127.0.0.1:7897`
+  * `python tools\update.py --check` 只检查不更新
+- `2-清单规则` 之后多一个入口 `3-更新版本`：老用户不用重新下载 100MB 安装包
+
+---
+
 ## v4.2 — 2026-11-25
 
 ### 变更

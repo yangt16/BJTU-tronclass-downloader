@@ -72,6 +72,7 @@ echo "   1. put a course list into lists/ (see docs/使用说明.md)"
 echo "   2. double-click 1-开始下载.command in this folder"
 echo "        a menu will ask: product, scope, jobs, segments"
 echo "   3. per-course rules: double-click 2-清单规则.command"
+echo "   4. update later: double-click 3-更新版本.command"
 echo "============================================================"
 printf "\nPress Enter to close..."
 read -r _ || true

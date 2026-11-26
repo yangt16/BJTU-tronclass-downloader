@@ -33,7 +33,7 @@ scripts = sorted(set(list(ROOT.glob("*.sh")) + list(ROOT.glob("*.command"))
                      + list((ROOT / "tools").glob("*.sh"))))
 # 根目录只该有两个 .command（首次安装 + 开始下载），外加 tools/getlec.sh
 expected = {"0-首次安装.command", "1-开始下载.command", "2-清单规则.command",
-            "getlec.sh"}
+            "3-更新版本.command", "getlec.sh"}
 check("根目录 shell 入口集合正确", {p.name for p in scripts} == expected,
       sorted(p.name for p in scripts))
 
@@ -46,7 +46,8 @@ for p in scripts:
 
 # 入口必须都转发到 tools/getlec.sh（避免逻辑重复）
 for p in scripts:
-    if p.name in ("getlec.sh", "0-首次安装.command", "2-清单规则.command"):
+    if p.name in ("getlec.sh", "0-首次安装.command", "2-清单规则.command",
+                  "3-更新版本.command"):
         continue  # 首次安装与规则配置不经过 getlec
     text = p.read_text(encoding="utf-8", errors="replace")
     check(f"{p.name}: 调用 tools/getlec.sh", "./tools/getlec.sh" in text)

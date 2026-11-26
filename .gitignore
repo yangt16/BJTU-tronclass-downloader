@@ -3,6 +3,7 @@ media/
 release/
 bin/
 python/
+/*.exe
 
 # ---- 敏感：带 ts/token 签名的地址，等于会话凭据 ----
 har_archive/

@@ -77,6 +77,7 @@ echo    1. put a course list into lists\ (see docs for how)
 echo    2. double-click the entry starting with 1 in this folder
 echo       a menu will ask: product, scope, jobs, segments
 echo    3. per-course rules: double-click the entry starting with 2
+echo    4. update later: double-click the entry starting with 3
 echo ============================================================
 if "%GETLEC_NOPAUSE%"=="" pause
 exit /b 0

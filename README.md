@@ -29,6 +29,7 @@
 | **下载报告** | 结束时汇总本次大小/用时/平均速度，例：`[报告] 新下载 3 节 · 录像 4200 MB + 音轨 330 MB · 平均 2.4 MB/s` |
 | **批量全局进度** | 多份清单连跑时统一算剩余时间：`[batch] 全局 3/12 节 已用 … 预计剩余 …` |
 | **归档/日志清理** | `tools\clean_archive.py`：按天数/数量预览或删除旧归档与日志 |
+| **一键更新** | 双击 `3-更新版本.cmd` 自动检查/下载最新 Release 并覆盖程序文件，`media\`、`lists\` 等数据不动 |
 | **按课程规则** | 每门课可单独设"只下周四 / 排除周二 / 只要音频"（`2-清单规则.cmd` 配置），批量时各按各的规则跑 |
 | **一键抓整门课** | 浏览器里点一下书签，整门课 20+ 节地址一次导出 |
 | **间接地址自动换直链** | 清单里可以直接写 `previewToken` 地址，下载时自动换成签名直链 |
@@ -95,6 +96,12 @@ D:\course-notes\lists\XX课程.txt
 每行「轨名 + 播放地址」（书签自动导出；`#` 开头是注释）。地址怎么拿，见使用说明的
 [手动版](docs/使用说明.md#手动版自己粘地址) 或
 [自动版（书签）](docs/使用说明.md#自动版书签一次抓一门课)。
+
+### 更新到新版
+
+双击 `3-更新版本.cmd`（macOS/Linux：`3-更新版本.command`）。会检查 GitHub 最新 Release，
+下载并覆盖程序文件；`media\`、`lists\`（含 `.rules` / 台账）、`har_archive\`、`logs\`
+和 `.menu.json` 都会保留。需要能连 GitHub（连不上就先开代理/梯子）。
 
 ### 2. 双击开始下载
 
@@ -179,14 +186,16 @@ D:\course-notes\
 ├─ 0-首次安装.cmd            ★ 首次使用（Windows）：补齐 ffmpeg + 建 lists\
 ├─ 1-开始下载.cmd             ★ 下载入口：弹菜单选产物和范围
 ├─ 2-清单规则.cmd             ★ 按课程配置下载规则（只下某天/星期几）
+├─ 3-更新版本.cmd             ★ 一键更新到最新版（保留 media/lists）
 ├─ 0-首次安装.command         ★ 同上（macOS / Linux）
 ├─ 1-开始下载.command          ★ 同上（macOS / Linux）
 ├─ 2-清单规则.command          ★ 同上（macOS / Linux）
+├─ 3-更新版本.command           ★ 一键更新到最新版（macOS / Linux）
 ├─ docs\使用说明.md           完整使用手册
 ├─ LICENSE                    MIT 许可证
 ├─ CHANGELOG.md               版本更新日志
 ├─ bin\                       ffmpeg / ffprobe
-├─ tools\                     37 个脚本（下载、编排、抓取、测试）
+├─ tools\                     39 个脚本（下载、编排、抓取、测试）
 │  ├─ getlec.cmd / getlec.sh  主脚本（各入口都调用它）
 │  └─ ...                     其余工具与测试
 ├─ dist\                      抓取书签（install.html / bookmarks.html）

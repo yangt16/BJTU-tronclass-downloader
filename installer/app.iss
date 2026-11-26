@@ -73,13 +73,15 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 
 [Files]
 Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; 快捷方式用的图标：单独放一份到 {app}\app.ico，不依赖发布 zip 里带不带 installer\
+Source: "{#SetupIcon}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\1-开始下载.cmd"; WorkingDir: "{app}"; IconFilename: "{sys}\cmd.exe"
-Name: "{group}\按课程设置规则"; Filename: "{app}\2-清单规则.cmd"; WorkingDir: "{app}"; IconFilename: "{sys}\cmd.exe"
-Name: "{group}\检查更新"; Filename: "{app}\3-更新版本.cmd"; WorkingDir: "{app}"; IconFilename: "{sys}\cmd.exe"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\1-开始下载.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\app.ico"
+Name: "{group}\按课程设置规则"; Filename: "{app}\2-清单规则.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\app.ico"
+Name: "{group}\检查更新"; Filename: "{app}\3-更新版本.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\app.ico"
 Name: "{group}\书签安装说明"; Filename: "{app}\dist\install.html"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\1-开始下载.cmd"; WorkingDir: "{app}"; IconFilename: "{sys}\cmd.exe"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\1-开始下载.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\app.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\dist\install.html"; Description: "查看书签安装说明（抓清单用）"; Flags: shellexec postinstall skipifsilent unchecked

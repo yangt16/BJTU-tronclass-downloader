@@ -142,7 +142,21 @@ _sh.rmtree(_mem_dir, ignore_errors=True)
 
 # ---------- 嵌入式 Python 场景（脚本目录不在 sys.path）----------
 import subprocess as _sp
+# CI（尤其 Linux）可能没有真 ffmpeg；这个用例会真的启动引擎，
+# 所以给 PATH 塞假的 ffmpeg/ffprobe，避免依赖 runner 环境。
+_fakebin = _pl.Path(menu.ROOT) / "tmp" / f"testmenu_fakebin_{_os.getpid()}"
+_sh.rmtree(_fakebin, ignore_errors=True)
+_fakebin.mkdir(parents=True)
+if _os.name == "nt":
+    for _n in ("ffmpeg.cmd", "ffprobe.cmd"):
+        (_fakebin / _n).write_text("@exit /b 0\r\n", encoding="ascii")
+else:
+    for _n in ("ffmpeg", "ffprobe"):
+        _f = _fakebin / _n
+        _f.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        _f.chmod(0o755)
 _env = dict(_os.environ, GETLEC_DRYRUN="1", GETLEC_NOPAUSE="1")
+_env["PATH"] = str(_fakebin) + _os.pathsep + _env.get("PATH", "")
 _code = ("import runpy, sys; "
          "sys.path = [p for p in sys.path if not p.rstrip('\\\\/').endswith('tools')]; "
          "runpy.run_path(sys.argv[1], run_name='__main__')")
@@ -154,6 +168,7 @@ check("隔离 sys.path 下菜单可启动",
       (r.returncode == 0 and "ModuleNotFoundError" not in r.stderr), True)
 if r.returncode != 0:
     print("    stderr:", (r.stderr or "")[-300:])
+_sh.rmtree(_fakebin, ignore_errors=True)
 
 print()
 print("全部通过" if bad == 0 else f"{bad} 项失败")

@@ -17,6 +17,11 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+# 嵌入式 Python（安装包自带）不会自动把脚本目录加进 sys.path，
+# 这里显式插入，保证 `import rules` 能找到同目录模块。
+TOOLS_DIR = pathlib.Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
 LISTS = ROOT / "lists"
 WEEK_CN = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日"}
 MODE_CN = {"1": "视频 + 音频", "2": "只要音频", "3": "只要视频"}

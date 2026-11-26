@@ -140,6 +140,21 @@ menu.forget_memory(_mem)
 check("forget 删除文件", _mem.exists(), False)
 _sh.rmtree(_mem_dir, ignore_errors=True)
 
+# ---------- 嵌入式 Python 场景（脚本目录不在 sys.path）----------
+import subprocess as _sp
+_env = dict(_os.environ, GETLEC_DRYRUN="1", GETLEC_NOPAUSE="1")
+_code = ("import runpy, sys; "
+         "sys.path = [p for p in sys.path if not p.rstrip('\\\\/').endswith('tools')]; "
+         "runpy.run_path(sys.argv[1], run_name='__main__')")
+r = _sp.run([sys.executable, "-c", _code,
+             str(_pl.Path(menu.ROOT) / "tools" / "menu.py")],
+            input="1\n1\n1\n1\n", capture_output=True, text=True,
+            env=_env, cwd=str(menu.ROOT), timeout=180)
+check("隔离 sys.path 下菜单可启动",
+      (r.returncode == 0 and "ModuleNotFoundError" not in r.stderr), True)
+if r.returncode != 0:
+    print("    stderr:", (r.stderr or "")[-300:])
+
 print()
 print("全部通过" if bad == 0 else f"{bad} 项失败")
 sys.exit(0 if bad == 0 else 1)

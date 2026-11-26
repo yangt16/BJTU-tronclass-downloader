@@ -14,6 +14,11 @@
   * `python tools\update.py --check` 只检查不更新
 - `2-清单规则` 之后多一个入口 `3-更新版本`：老用户不用重新下载 100MB 安装包
 
+### 修复
+- **安装包（内置 Python）双击闪退**：嵌入式 Python 不会自动把脚本目录加入
+  `sys.path`，`tools/menu.py` 里 `import rules` 失败。已在 menu.py 显式插入
+  自身目录；`test_menu` 增加"隔离 sys.path 下菜单可启动"回归项。
+
 ---
 
 ## v4.2 — 2026-11-25

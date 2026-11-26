@@ -61,9 +61,13 @@ check("tools/getlec.sh 调用 lectures.py",
 import subprocess as _sp
 _modes = {}
 try:
-    _r = _sp.run(["git", "-C", str(ROOT), "ls-files", "-s"],
+    # core.quotePath=false 必须加：默认会把中文路径转义成 "0-\351\246..."，
+    # 带引号的 key 匹配不上，检查会静默空转（v4.3 就因此漏了执行位）。
+    _r = _sp.run(["git", "-c", "core.quotePath=false", "-C", str(ROOT), "ls-files", "-s"],
                  capture_output=True, text=True, encoding="utf-8",
                  errors="replace", timeout=60)
+    if _r.returncode != 0:
+        print(f"  ! git ls-files 失败（退出码 {_r.returncode}），跳过模式检查")
     for _line in _r.stdout.splitlines():
         _parts = _line.split("\t")
         if len(_parts) == 2:
@@ -72,8 +76,10 @@ except Exception as _e:
     print(f"  ! 读取 git 索引失败，跳过模式检查: {_e}")
 for _name in ("0-首次安装.command", "1-开始下载.command",
               "2-清单规则.command", "3-更新版本.command", "tools/getlec.sh"):
-    if _name in _modes:
-        check(f"git 模式 {_name}", _modes[_name], "100755")
+    if _name not in _modes:
+        print(f"  ! git 索引里没有 {_name}（改名了？），跳过模式检查")
+        continue
+    check(f"git 模式 {_name}", _modes[_name] == "100755", _modes[_name])
 
 print()
 print("全部通过" if bad == 0 else f"{bad} 项失败")
